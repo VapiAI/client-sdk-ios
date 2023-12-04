@@ -30,7 +30,6 @@ public class Vapi: CallClientDelegate {
             self.call = CallClient()
             self.call?.delegate = self
             do {
-<<<<<<< HEAD
                 try await self.call?.join(
                     url: url,
                     settings: .init(
@@ -40,9 +39,6 @@ public class Vapi: CallClientDelegate {
                         )
                     )
                 )
-=======
-                try await self.call?.join(url: url)
->>>>>>> 10426cee7e6dfeacc3c1bb6f748905fe1536efab
                 self.callDidJoin()
             } catch {
                 print("Error: \(error)")
