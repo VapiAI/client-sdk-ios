@@ -81,6 +81,13 @@ public class Vapi: CallClientDelegate {
         }
         task.resume()
     }
+    
+    public func callClient(
+        _ callClient: CallClient,
+        participantUpdated participant: Participant
+    ) {
+      print(participant)
+    }
 
     @MainActor
     public func start(assistantId: String) {
