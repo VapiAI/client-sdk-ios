@@ -86,6 +86,8 @@ public class Vapi: CallClientDelegate {
         _ callClient: CallClient,
         participantUpdated participant: Participant
     ) {
+      print("participantUpdated")
+
       print(participant)
     }
     
@@ -93,6 +95,7 @@ public class Vapi: CallClientDelegate {
         _ callClient: CallClient,
         participantJoined participant: Participant
     ) {
+      print("participantJoined")
       print(participant)
     }
     
@@ -100,6 +103,7 @@ public class Vapi: CallClientDelegate {
         _ callClient: CallClient,
         subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile
     ) {
+        print("subscriptionProfilesUpdated")
       print(subscriptionProfiles)
     }
     
@@ -107,6 +111,7 @@ public class Vapi: CallClientDelegate {
         _ callClient: CallClient,
         subscriptionsUpdated subscriptions: SubscriptionSettingsByID
     ) {
+        print("subscriptionsUpdated")
       print(subscriptions)
     }
 
