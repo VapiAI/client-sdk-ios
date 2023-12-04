@@ -88,6 +88,27 @@ public class Vapi: CallClientDelegate {
     ) {
       print(participant)
     }
+    
+    public func callClient(
+        _ callClient: CallClient,
+        participantJoined participant: Participant
+    ) {
+      print(participant)
+    }
+    
+    public func callClient(
+        _ callClient: CallClient,
+        subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile
+    ) {
+      print(subscriptionProfiles)
+    }
+    
+    public func callClient(
+        _ callClient: CallClient,
+        subscriptionsUpdated subscriptions: SubscriptionSettingsByID
+    ) {
+      print(subscriptions)
+    }
 
     @MainActor
     public func start(assistantId: String) {
