@@ -96,6 +96,7 @@ public class Vapi: CallClientDelegate {
         participantJoined participant: Participant
     ) async {
         if(participant.info.username=="Vapi Speaker"){
+            print("PLAYABLE")
             let message: [String: Any] = ["message": "Playable"]
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
