@@ -94,9 +94,16 @@ public class Vapi: CallClientDelegate {
     public func callClient(
         _ callClient: CallClient,
         participantJoined participant: Participant
-    ) {
-      print("participantJoined")
-      print(participant)
+    ) async {
+        if(participant.info.username=="Vapi Speaker"){
+            let message: [String: Any] = ["message": "Playable"]
+            do {
+                let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
+                try await self.call?.sendAppMessage(json: jsonData, to: .all)
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
     }
     
     public func callClient(
