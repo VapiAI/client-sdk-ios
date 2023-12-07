@@ -3,6 +3,6 @@ import XCTest
 
 final class VapiTests: XCTestCase {
     func testExample() throws {
-        Vapi(clientToken: "")
+        _ = Vapi(clientToken: "")
     }
 }
