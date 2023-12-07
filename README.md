@@ -1,4 +1,4 @@
-# Vapi iOS SDK
+# Vapi iOS SDK (Under Development)
 
 This package lets you start Vapi calls directly in your iOS app.
 
