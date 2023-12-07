@@ -27,6 +27,24 @@ public protocol VapiDelegate: AnyObject {
     func didEncounterError(error: VapiError)
 }
 
+public class VapiDelegateWrapper: VapiDelegate {
+    var callDidStartHandler: (() -> Void)?
+    var callDidEndHandler: (() -> Void)?
+    var didEncounterErrorHandler: ((VapiError) -> Void)?
+
+    public func callDidStart() {
+        callDidStartHandler?()
+    }
+
+    public func callDidEnd() {
+        callDidEndHandler?()
+    }
+
+    public func didEncounterError(error: VapiError) {
+        didEncounterErrorHandler?(error)
+    }
+}
+
 // MARK: - Network Manager
 
 class NetworkManager {
