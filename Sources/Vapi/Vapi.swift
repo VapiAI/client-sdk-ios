@@ -176,7 +176,9 @@ public class Vapi: CallClientDelegate {
     }
 
     // participantUpdated event
-    public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {}
+    public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
+        print("Participant Updated: \(participant)")
+    }
 
     // participantJoined event
     public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
@@ -195,10 +197,14 @@ public class Vapi: CallClientDelegate {
     }
 
     // subscriptionProfilesUpdated event
-    public func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {}
+    public func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {
+        print("Subscription Profile Updated: \(subscriptionProfiles)")
+    }
 
     // subscriptionsUpdated event
-    public func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID) {}
+    public func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID) {
+        print("Subscription Updated: \(subscriptions)")
+    }
     
  
     // callStateUpdated event
