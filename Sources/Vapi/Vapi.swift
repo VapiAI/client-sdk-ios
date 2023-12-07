@@ -81,13 +81,21 @@ public class Vapi: CallClientDelegate {
         Task {
             do {
                 let call = CallClient()
-                _ = try await call.join(url: url, settings: CallClientSettings.defaultSettings())
-                
                 self.call = call
+                
+                _ = try await call.join(
+                    url: url,
+                    settings: .init(
+                        inputs: .set(
+                            camera: .set(.enabled(false)),
+                            microphone: .set(.enabled(true))
+                        )
+                    )
+                )
+                
                 self.call?.delegate = self
-                self.callDidJoin()
             } catch {
-                self.delegate?.didEncounterError(error: .networkError(error))
+                self.callDidFail(with: .networkError(error))
             }
         }
     }
@@ -131,12 +139,14 @@ public class Vapi: CallClientDelegate {
 
     @MainActor
     public func start(assistantId: String) {
+        if(self.call != nil) { return }
         let body = WebCallRequestBody(assistantId: assistantId, assistant: nil)
         self.startCall(body: body)
     }
 
     @MainActor
     public func start(assistant: [String: Any]) {
+        if(self.call != nil) { return }
         let body = WebCallRequestBody(assistantId: nil, assistant: assistant)
         self.startCall(body: body)
     }
@@ -145,7 +155,6 @@ public class Vapi: CallClientDelegate {
         Task {
             do {
                 try await call?.leave()
-                self.callDidLeave()
             } catch {
                 self.delegate?.didEncounterError(error: .networkError(error))
             }
@@ -162,20 +171,20 @@ public class Vapi: CallClientDelegate {
     func callDidLeave() {
         print("Successfully left call.")
         self.delegate?.callDidEnd()
+        self.call = nil
     }
 
-    func callDidFail(with error: Error) {
+    func callDidFail(with error: VapiError) {
         print("Got error while joining/leaving call: \(error).")
         self.delegate?.didEncounterError(error: .networkError(error))
+        self.call = nil
     }
 
     // participantUpdated event
-    func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
-        print("Participant Updated: \(participant)")
-    }
+    public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {}
 
     // participantJoined event
-    func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
+    public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
         print("Participant Joined: \(participant)")
         if participant.info.username == "Vapi Speaker" {
             let message: [String: Any] = ["message": "playable"]
@@ -191,63 +200,28 @@ public class Vapi: CallClientDelegate {
     }
 
     // subscriptionProfilesUpdated event
-    func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {
-        print("Subscription Profiles Updated: \(subscriptionProfiles)")
-    }
+    public func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {}
 
     // subscriptionsUpdated event
-    func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID) {
-        print("Subscriptions Updated: \(subscriptions)")
-    }
-}
-
-// MARK: - Helper Classes/Structs
-
-// Assuming CallClient, Participant, and other related types are defined elsewhere
-
-struct CallClientSettings {
-    static func defaultSettings() -> CallClient.Settings {
-        // Return default settings
-        // This is a placeholder. You should implement this according to your application's needs.
-        return CallClient.Settings()
-    }
-}
-
-// Participant model (Placeholder - Define according to actual requirements)
-struct Participant {
-    var info: ParticipantInfo
-}
-
-// ParticipantInfo model (Placeholder - Define according to actual requirements)
-struct ParticipantInfo {
-    var username: String
-}
-
-// SubscriptionProfileSettingsByProfile and SubscriptionSettingsByID (Placeholder - Define according to actual requirements)
-struct SubscriptionProfileSettingsByProfile { /* ... */ }
-struct SubscriptionSettingsByID { /* ... */ }
-
-// CallClient (Placeholder - Define according to actual requirements)
-class CallClient {
-    func join(url: URL, settings: CallClient.Settings) async throws { /* ... */ }
-    func leave() async throws { /* ... */ }
-    func sendAppMessage(json: Data, to: AppMessageRecipient) async throws { /* ... */ }
-    var delegate: CallClientDelegate?
+    public func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID) {}
     
-    struct Settings { /* ... */ }
-}
-
-// CallClientDelegate (Placeholder - Define according to actual requirements)
-protocol CallClientDelegate {
-    func callClient(_ callClient: CallClient, participantUpdated participant: Participant)
-    func callClient(_ callClient: CallClient, participantJoined participant: Participant)
-    func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile)
-    func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID)
-}
-
-enum AppMessageRecipient {
-    case all
-    // Define other cases as needed
+ 
+    // callStateUpdated event
+    public func callClient(
+        _ callClient: CallClient,
+        callStateUpdated state: CallState
+    ) {
+        switch(state){
+        case CallState.left:
+            self.callDidLeave()
+            break
+        case CallState.joined:
+            self.callDidJoin()
+            break
+        default:
+            break
+        }
+    }
 }
 
 // MARK: - End of Vapi Class
