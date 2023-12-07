@@ -111,7 +111,7 @@ public class Vapi: CallClientDelegate {
         request.httpMethod = "POST"
         request.addValue("Bearer \(self.clientToken)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
+        print(body)
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
