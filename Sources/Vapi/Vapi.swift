@@ -55,18 +55,19 @@ class NetworkManager {
 // MARK: - Vapi Class
 
 public class Vapi: CallClientDelegate {
-    private let clientToken: String
-    private let apiUrl: String
+    private static var clientToken: String = "EMPTY_TOKEN"
+    private static var apiUrl: String = VAPI_API_URL
+    private static weak var delegate: VapiDelegate?
+    private static var call: CallClient?
+    
+    private init() {}
 
-    weak var delegate: VapiDelegate?
-    private var call: CallClient?
-
-    public init(clientToken: String) {
+    public static func configure(clientToken: String) {
         self.clientToken = clientToken
         self.apiUrl = VAPI_API_URL
     }
     
-    public init(clientToken: String, apiUrl: String) {
+    public static func configure(clientToken: String, apiUrl: String) {
         self.clientToken = clientToken
         self.apiUrl = apiUrl
     }
@@ -76,8 +77,8 @@ public class Vapi: CallClientDelegate {
         Task {
             do {
                 let call = CallClient()
-                self.call = call
-                self.call?.delegate = self
+                Vapi.call = call
+                Vapi.call?.delegate = self
                 
                 _ = try await call.join(
                     url: url,
@@ -96,14 +97,14 @@ public class Vapi: CallClientDelegate {
 
     @MainActor
     private func startCall(body: [String: Any]) {
-        guard let url = URL(string: self.apiUrl + "/call/web") else {
+        guard let url = URL(string: Vapi.apiUrl + "/call/web") else {
             self.callDidFail(with: .invalidURL)
             return
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(self.clientToken)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(Vapi.clientToken)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
@@ -133,14 +134,14 @@ public class Vapi: CallClientDelegate {
 
     @MainActor
     public func start(assistantId: String) {
-        if(self.call != nil) { return }
+        if(Vapi.call != nil) { return }
         let body = ["assistantId":assistantId]
         self.startCall(body: body)
     }
 
     @MainActor
     public func start(assistant: [String: Any]) {
-        if(self.call != nil) { return }
+        if(Vapi.call != nil) { return }
         let body = ["assistant":assistant]
         self.startCall(body: body)
     }
@@ -148,7 +149,7 @@ public class Vapi: CallClientDelegate {
     public func stop() {
         Task {
             do {
-                try await call?.leave()
+                try await Vapi.call?.leave()
             } catch {
                 self.callDidFail(with: .networkError(error))
             }
@@ -159,54 +160,37 @@ public class Vapi: CallClientDelegate {
 
     func callDidJoin() {
         print("Successfully joined call.")
-        self.delegate?.callDidStart()
+        Vapi.delegate?.callDidStart()
     }
 
     func callDidLeave() {
         print("Successfully left call.")
-        self.delegate?.callDidEnd()
-        self.call = nil
+        Vapi.delegate?.callDidEnd()
+        Vapi.call = nil
     }
 
     func callDidFail(with error: VapiError) {
         print("Got error while joining/leaving call: \(error).")
-        self.delegate?.didEncounterError(error: .networkError(error))
-        self.call = nil
+        Vapi.delegate?.didEncounterError(error: .networkError(error))
+        Vapi.call = nil
     }
 
     // participantUpdated event
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
-        print("Participant Updated: \(participant)")
-        print("Participant Updated: \(participant.media?.microphone)")
-        print("Participant Updated: \(participant.media?.microphone.state)")
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
         if participant.info.username == "Vapi Speaker" && isPlayable {
             let message: [String: Any] = ["message": "playable"]
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
                 Task.detached {
-                    try await self.call?.sendAppMessage(json: jsonData, to: .all)
+                    try await Vapi.call?.sendAppMessage(json: jsonData, to: .all)
                 }
             } catch {
                 print("Error sending message: \(error.localizedDescription)")
             }
         }
     }
-
-    // participantJoined event
-    public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {}
-
-    // subscriptionProfilesUpdated event
-    public func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {
-        print("Subscription Profile Updated: \(subscriptionProfiles)")
-    }
-
-    // subscriptionsUpdated event
-    public func callClient(_ callClient: CallClient, subscriptionsUpdated subscriptions: SubscriptionSettingsByID) {
-        print("Subscription Updated: \(subscriptions)")
-    }
     
- 
     // callStateUpdated event
     public func callClient(
         _ callClient: CallClient,
