@@ -176,16 +176,9 @@ public class Vapi: CallClientDelegate {
 
     // participantUpdated event
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
-        print("Participant Updated: \(participant)")
-    }
-
-    // participantJoined event
-    public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
-        print("Participant Joined: \(participant)")
-        print("Participant Joined: \(participant.info.username)")
-        if participant.info.username == "Vapi Speaker" {
+        let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
+        if participant.info.username == "Vapi Speaker" && isPlayable {
             let message: [String: Any] = ["message": "playable"]
-            print(message)
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
                 Task.detached {
@@ -196,6 +189,9 @@ public class Vapi: CallClientDelegate {
             }
         }
     }
+
+    // participantJoined event
+    public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {}
 
     // subscriptionProfilesUpdated event
     public func callClient(_ callClient: CallClient, subscriptionProfilesUpdated subscriptionProfiles: SubscriptionProfileSettingsByProfile) {
