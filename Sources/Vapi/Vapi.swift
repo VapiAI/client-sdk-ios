@@ -105,7 +105,7 @@ public class Vapi: CallClientDelegate {
         request.httpMethod = "POST"
         request.addValue("Bearer \(self.clientToken)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        print(body)
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
@@ -182,8 +182,10 @@ public class Vapi: CallClientDelegate {
     // participantJoined event
     public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
         print("Participant Joined: \(participant)")
+        print("Participant Joined: \(participant.info.username)")
         if participant.info.username == "Vapi Speaker" {
             let message: [String: Any] = ["message": "playable"]
+            print(message)
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
                 Task.detached {
