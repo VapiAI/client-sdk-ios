@@ -11,11 +11,6 @@ struct WebCallResponse: Decodable {
     let webCallUrl: String
 }
 
-struct WebCallRequestBody {
-    let assistantId: String?
-    let assistant: [String: Any]?
-}
-
 enum VapiError: Swift.Error {
     case invalidURL
     case networkError(Swift.Error)
@@ -101,7 +96,7 @@ public class Vapi: CallClientDelegate {
     }
 
     @MainActor
-    private func startCall(body: WebCallRequestBody) {
+    private func startCall(body: [String: Any]) {
         guard let url = URL(string: self.apiUrl) else {
             self.delegate?.didEncounterError(error: .invalidURL)
             return
@@ -140,14 +135,14 @@ public class Vapi: CallClientDelegate {
     @MainActor
     public func start(assistantId: String) {
         if(self.call != nil) { return }
-        let body = WebCallRequestBody(assistantId: assistantId, assistant: nil)
+        let body = ["assistantId":assistantId]
         self.startCall(body: body)
     }
 
     @MainActor
     public func start(assistant: [String: Any]) {
         if(self.call != nil) { return }
-        let body = WebCallRequestBody(assistantId: nil, assistant: assistant)
+        let body = ["assistant":assistant]
         self.startCall(body: body)
     }
 
