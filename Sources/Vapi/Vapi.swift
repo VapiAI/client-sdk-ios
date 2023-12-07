@@ -3,7 +3,7 @@ import Daily
 
 // MARK: - Constants
 
-let VAPI_API_URL = "https://api.vapi.ai/call/web"
+let VAPI_API_URL = "https://api.vapi.ai"
 
 // MARK: - Models
 
@@ -96,8 +96,8 @@ public class Vapi: CallClientDelegate {
 
     @MainActor
     private func startCall(body: [String: Any]) {
-        guard let url = URL(string: self.apiUrl) else {
-            self.delegate?.didEncounterError(error: .invalidURL)
+        guard let url = URL(string: self.apiUrl + "/call/web") else {
+            self.callDidFail(with: .invalidURL)
             return
         }
 
@@ -109,7 +109,7 @@ public class Vapi: CallClientDelegate {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
-            self.delegate?.didEncounterError(error: .encodingError(error))
+            self.callDidFail(with: .encodingError(error))
             return
         }
 
@@ -121,10 +121,10 @@ public class Vapi: CallClientDelegate {
                             self.joinCall(with: url)
                         }
                     } else {
-                        self.delegate?.didEncounterError(error: .customError("Invalid webCallUrl"))
+                        self.callDidFail(with: .customError("Invalid webCallUrl"))
                     }
                 case .failure(let error):
-                    self.delegate?.didEncounterError(error: error)
+                    self.callDidFail(with: error)
             }
         }
     }
@@ -150,7 +150,7 @@ public class Vapi: CallClientDelegate {
             do {
                 try await call?.leave()
             } catch {
-                self.delegate?.didEncounterError(error: .networkError(error))
+                self.callDidFail(with: .networkError(error))
             }
         }
     }
