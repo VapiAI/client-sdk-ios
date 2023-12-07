@@ -75,6 +75,8 @@ public class Vapi: CallClientDelegate {
     private func joinCall(with url: URL) {
         Task {
             do {
+                Daily.setLogLevel(.error)
+                
                 let call = CallClient()
                 self.call = call
                 self.call?.delegate = self
