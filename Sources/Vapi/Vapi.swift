@@ -77,6 +77,7 @@ public class Vapi: CallClientDelegate {
             do {
                 let call = CallClient()
                 self.call = call
+                self.call?.delegate = self
                 
                 _ = try await call.join(
                     url: url,
@@ -87,8 +88,6 @@ public class Vapi: CallClientDelegate {
                         )
                     )
                 )
-                
-                self.call?.delegate = self
             } catch {
                 self.callDidFail(with: .networkError(error))
             }
