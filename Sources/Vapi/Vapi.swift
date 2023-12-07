@@ -176,6 +176,9 @@ public class Vapi: CallClientDelegate {
 
     // participantUpdated event
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
+        print("Participant Updated: \(participant)")
+        print("Participant Updated: \(participant.media?.microphone)")
+        print("Participant Updated: \(participant.media?.microphone.state)")
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
         if participant.info.username == "Vapi Speaker" && isPlayable {
             let message: [String: Any] = ["message": "playable"]
