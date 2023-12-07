@@ -99,7 +99,7 @@ public class Vapi: CallClientDelegate {
         print(participant)
         if participant.info.username == "Vapi Speaker" {
             print("PLAYABLE")
-            let message: [String: Any] = ["message": "Playable"]
+            let message: [String: Any] = ["message": "playable"]
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
                 Task.detached {
