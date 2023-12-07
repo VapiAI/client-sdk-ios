@@ -64,19 +64,19 @@ public class Vapi: CallClientDelegate {
     public init(clientToken: String) {
         self.clientToken = clientToken
         self.apiUrl = VAPI_API_URL
+        Daily.setLogLevel(.error)
     }
     
     public init(clientToken: String, apiUrl: String) {
         self.clientToken = clientToken
         self.apiUrl = apiUrl
+        Daily.setLogLevel(.error)
     }
 
     @MainActor
     private func joinCall(with url: URL) {
         Task {
             do {
-                Daily.setLogLevel(.off)
-                
                 let call = CallClient()
                 self.call = call
                 self.call?.delegate = self
