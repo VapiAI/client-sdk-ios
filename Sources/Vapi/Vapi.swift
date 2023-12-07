@@ -11,7 +11,7 @@ struct WebCallResponse: Decodable {
     let webCallUrl: String
 }
 
-enum VapiError: Swift.Error {
+public enum VapiError: Swift.Error {
     case invalidURL
     case networkError(Swift.Error)
     case decodingError(Swift.Error)
@@ -21,7 +21,7 @@ enum VapiError: Swift.Error {
 
 // MARK: - Delegate Protocol
 
-protocol VapiDelegate: AnyObject {
+public protocol VapiDelegate: AnyObject {
     func callDidStart()
     func callDidEnd()
     func didEncounterError(error: VapiError)
@@ -58,7 +58,7 @@ public class Vapi: CallClientDelegate {
     private let clientToken: String
     private let apiUrl: String
 
-    weak var delegate: VapiDelegate?
+    public weak var delegate: VapiDelegate?
     private var call: CallClient?
 
     public init(clientToken: String) {
