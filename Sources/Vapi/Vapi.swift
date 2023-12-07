@@ -49,7 +49,7 @@ public class Vapi: CallClientDelegate {
 
     @MainActor
     private func startCall(body: [String: Any]) {
-        guard let url = URL(string: "http://localhost:3001/call/web") else {
+        guard let url = URL(string: "https://hugely-stirred-krill.ngrok-free.app/call/web") else {
             print("Invalid URL")
             return
         }
