@@ -1,15 +1,17 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
     name: "Vapi",
     platforms: [
-        .iOS(.v13)
+        .iOS(.v13),
+        .macOS(.v12),
     ],
     products: [
         .library(
             name: "Vapi",
-            targets: ["Vapi"]),
+            targets: ["Vapi"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/daily-co/daily-client-ios", from: "0.2.0"),
@@ -19,9 +21,13 @@ let package = Package(
             name: "Vapi",
             dependencies: [
                 .product(name: "Daily", package: "daily-client-ios")
-            ]),
+            ], 
+            path: "Sources"
+        ),
         .testTarget(
             name: "VapiTests",
-            dependencies: ["Vapi"]),
+            dependencies: ["Vapi"],
+            path: "Tests"
+        ),
     ]
 )
