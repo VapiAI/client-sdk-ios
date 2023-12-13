@@ -2,22 +2,19 @@ import Combine
 import Daily
 import Foundation
 
-/// A delegate that clients can adopt to be notified of API events.
-public protocol VapiDelegate: AnyObject {
-    func callDidStart()
-    func callDidEnd()
-    func didEncounterError(error: VapiError)
-}
-
-public final class Vapi {
+public final class Vapi: CallClientDelegate {
+    
+    // MARK: - Supporting Types
+    
     /// A configuration that contains the host URL and the client token.
     ///
     /// This configuration is serializable via `Codable`.
     public struct Configuration: Codable, Hashable, Sendable {
-        public var host: URL
+        public var host: String
         public var clientToken: String
+        fileprivate static let defaultHost = "api.vapi.ai"
         
-        init(host: URL = URL(string: "https://api.vapi.ai")!, clientToken: String) {
+        init(clientToken: String, host: String) {
             self.host = host
             self.clientToken = clientToken
         }
@@ -26,29 +23,30 @@ public final class Vapi {
     public enum Event {
         case callDidStart
         case callDidEnd
-        case error(VapiError)
+        case error(Swift.Error)
     }
     
+    // MARK: - Properties
+
+    public let configuration: Configuration
+
     fileprivate let eventSubject = PassthroughSubject<Event, Never>()
+    
+    private let networkManager = NetworkManager()
+    private var call: CallClient?
+    
+    // MARK: - Computed Properties
+    
+    private var clientToken: String {
+        configuration.clientToken
+    }
     
     /// A Combine publisher that clients can subscribe to for API events.
     public var eventPublisher: AnyPublisher<Event, Never> {
         eventSubject.eraseToAnyPublisher()
     }
     
-    public let configuration: Configuration
-    
-    private var apiUrl: String {
-        configuration.host.absoluteString
-    }
-    
-    private var clientToken: String {
-        configuration.clientToken
-    }
-    
-    public weak var delegate: VapiDelegate?
-    
-    private var call: CallClient?
+    // MARK: - Init
     
     public init(configuration: Configuration) {
         self.configuration = configuration
@@ -56,24 +54,19 @@ public final class Vapi {
         Daily.setLogLevel(.error)
     }
     
-    public convenience init(
-        clientToken: String
-    ) {
-        self.init(configuration: .init(clientToken: clientToken))
+    public convenience init(clientToken: String) {
+        self.init(configuration: .init(clientToken: clientToken, host: Configuration.defaultHost))
     }
     
-    public convenience init(
-        clientToken: String,
-        hostURL: URL
-    ) {
-        self.init(configuration: .init(host: hostURL, clientToken: clientToken))
+    public convenience init(clientToken: String, host: String? = nil) {
+        self.init(configuration: .init(clientToken: clientToken, host: host ?? Configuration.defaultHost))
     }
     
-    public func start(
-        assistantId: String
-    ) {
+    // MARK: - Instance Methods
+    
+    public func start(assistantId: String) throws {
         guard self.call == nil else {
-            return
+            throw VapiError.existingCallInProgress
         }
         
         let body = ["assistantId": assistantId]
@@ -81,11 +74,9 @@ public final class Vapi {
         self.startCall(body: body)
     }
     
-    public func start(
-        assistant: [String: Any]
-    ) {
+    public func start(assistant: [String: Any]) throws {
         guard self.call == nil else {
-            return
+            throw VapiError.existingCallInProgress
         }
         
         let body = ["assistant": assistant]
@@ -98,146 +89,127 @@ public final class Vapi {
             do {
                 try await call?.leave()
             } catch {
-                self.callDidFail(with: .networkError(error))
+                self.callDidFail(with: error)
             }
         }
     }
-}
-
-extension Vapi {
-    @MainActor
-    private func joinCall(with url: URL) async throws {
-        do {
-            let call = CallClient()
-            self.call = call
-            
-            self.call?.delegate = self
-            
-            _ = try await call.join(
-                url: url,
-                settings: .init(
-                    inputs: .set(
-                        camera: .set(.enabled(false)),
-                        microphone: .set(.enabled(true))
+    
+    private func joinCall(with url: URL) {
+        Task { @MainActor in
+            do {
+                let call = CallClient()
+                call.delegate = self
+                self.call = call
+                
+                _ = try await call.join(
+                    url: url,
+                    settings: .init(
+                        inputs: .set(
+                            camera: .set(.enabled(false)),
+                            microphone: .set(.enabled(true))
+                        )
                     )
                 )
-            )
-        } catch {
-            self.callDidFail(with: .networkError(error))
+            } catch {
+                callDidFail(with: error)
+            }
         }
     }
     
+    private func makeURL(for path: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = configuration.host
+        components.path = path
+        return components.url
+    }
+    
+    private func makeURLRequest(for url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(clientToken)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        return request
+    }
+    
     private func startCall(body: [String: Any]) {
-        guard let url = URL(string: self.apiUrl + "/call/web") else {
-            self.callDidFail(with: .invalidURL)
+        guard let url = makeURL(for: "/call/web") else {
+            callDidFail(with: VapiError.invalidURL)
             return
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("Bearer \(self.clientToken)", forHTTPHeaderField: "Authorization")
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        var request = makeURLRequest(for: url)
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
-            self.callDidFail(with: .encodingError(error))
-            
+            self.callDidFail(with: error)
             return
         }
         
-        NetworkManager.performRequest(urlRequest: request) { (result: Result<WebCallResponse, VapiError>) in
-            switch result {
-                case .success(let response):
-                    Task { @MainActor in
-                        if let url = URL(string: response.webCallUrl) {
-                            try await self.joinCall(with: url)
-                        } else {
-                            self.callDidFail(with: .customError("Invalid webCallUrl"))
-                        }
-                    }
-                case .failure(let error):
-                    Task { @MainActor in
-                        self.callDidFail(with: error)
-                    }
+        Task { [request] in
+            do {
+                let response: WebCallResponse = try await networkManager.perform(request: request)
+                joinCall(with: response.webCallUrl)
+            } catch {
+                callDidFail(with: error)
             }
         }
     }
-}
-
-// MARK: - Conformances
-
-extension Vapi: Daily.CallClientDelegate {
+    
+    // MARK: - CallClientDelegate
+    
     func callDidJoin() {
         print("Successfully joined call.")
         
-        self.delegate?.callDidStart()
         self.eventSubject.send(.callDidStart)
     }
     
     func callDidLeave() {
         print("Successfully left call.")
         
-        self.delegate?.callDidEnd()
         self.eventSubject.send(.callDidEnd)
         self.call = nil
     }
     
-    func callDidFail(with error: VapiError) {
+    func callDidFail(with error: Swift.Error) {
         print("Got error while joining/leaving call: \(error).")
         
-        self.delegate?.didEncounterError(error: .networkError(error))
         self.eventSubject.send(.error(error))
         self.call = nil
     }
     
-    // participantUpdated event
-    public func callClient(
-        _ callClient: CallClient,
-        participantUpdated participant: Participant
-    ) {
+    public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
-        if participant.info.username == "Vapi Speaker" && isPlayable {
+        let isVapiSpeaker = participant.info.username == "Vapi Speaker"
+        let shouldSendAppMessage = isPlayable && isVapiSpeaker
+        
+        guard shouldSendAppMessage else {
+            return
+        }
+        
+        do {
             let message: [String: Any] = ["message": "playable"]
-            do {
-                let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
-                Task.detached {
-                    try await self.call?.sendAppMessage(json: jsonData, to: .all)
-                }
-            } catch {
-                print("Error sending message: \(error.localizedDescription)")
+            let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
+            
+            Task {
+                try await self.call?.sendAppMessage(json: jsonData, to: .all)
             }
+        } catch {
+            print("Error sending message: \(error.localizedDescription)")
         }
     }
     
-    // callStateUpdated event
-    public func callClient(
-        _ callClient: CallClient,
-        callStateUpdated state: CallState
-    ) {
+    public func callClient(_ callClient: CallClient, callStateUpdated state: CallState) {
         switch (state) {
-            case CallState.left:
-                self.callDidLeave()
-                break
-            case CallState.joined:
-                self.callDidJoin()
-                break
-            default:
-                break
+        case CallState.left:
+            self.callDidLeave()
+            break
+        case CallState.joined:
+            self.callDidJoin()
+            break
+        default:
+            break
         }
     }
-}
-
-// MARK: - Auxiliary
-
-struct WebCallResponse: Decodable {
-    let webCallUrl: String
-}
-
-public enum VapiError: Swift.Error {
-    case invalidURL
-    case networkError(Swift.Error)
-    case decodingError(Swift.Error)
-    case encodingError(Swift.Error)
-    case customError(String)
 }

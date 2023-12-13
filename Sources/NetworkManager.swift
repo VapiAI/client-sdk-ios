@@ -5,27 +5,12 @@
 import Foundation
 
 class NetworkManager {
-    static func performRequest<T: Decodable>(
-        urlRequest: URLRequest,
-        completion: @escaping (Result<T, VapiError>) -> Void
-    ) {
-        URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(.failure(.networkError(error)))
-                    return
-                }
-                guard let data = data else {
-                    completion(.failure(.customError("No data received")))
-                    return
-                }
-                do {
-                    let decodedResponse = try JSONDecoder().decode(T.self, from: data)
-                    completion(.success(decodedResponse))
-                } catch {
-                    completion(.failure(.decodingError(error)))
-                }
-            }
-        }.resume()
+    
+    private let session = URLSession(configuration: .default)
+    
+    func perform<T: Decodable>(request: URLRequest) async throws -> T {
+        let (data, _) = try await session.data(for: request)
+        let result = try JSONDecoder().decode(T.self, from: data)
+        return result
     }
 }
