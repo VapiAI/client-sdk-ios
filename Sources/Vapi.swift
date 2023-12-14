@@ -218,9 +218,7 @@ public final class Vapi: CallClientDelegate {
         do {
             // Parse the JSON data
             if let messageDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-                // Create a custom event or use an existing one
-                let event = Event.appMessageReceived(messageDict, from: participantID)
-                // Emit the event
+                let event = Event.messageReceived(messageDict)
                 self.eventSubject.send(event)
             }
         } catch {
