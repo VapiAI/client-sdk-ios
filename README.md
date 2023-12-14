@@ -1,4 +1,4 @@
-# Vapi iOS SDK (Under Development)
+# Vapi iOS SDK
 
 This package lets you start Vapi calls directly in your iOS app.
 
@@ -71,7 +71,39 @@ If you view the raw file contents of Info.plist, it should look like this:
 
 ## Usage
 
+### 1. Starting a Call
 
+- **Methods:** 
+  - `start(assistantId: String)`
+  - `start(assistant: [String: Any])`
+- **Description:** 
+  - Use these methods to initiate a new call. You can either start a call by passing an `assistantId` or by providing an `assistant` dictionary with specific parameters.
+  - These methods throw an error if there's already an ongoing call to ensure that only one call is active at any time.
+
+### 2. Stopping a Call
+
+- **Method:** `stop()`
+- **Description:** 
+  - This method ends an ongoing call.
+  - It's an asynchronous operation, ensuring the call is properly disconnected.
+
+### 3. Handling Events
+
+- **Overview:** The SDK provides various events that you can listen to for handling different aspects of the call lifecycle and interactions.
+- **Key Events:** 
+  - `callDidStart`: Emitted when a call successfully begins.
+  - `callDidEnd`: Emitted when a call is successfully ended.
+  - `appMessageReceived([String: Any], from: Daily.ParticipantID)`: Occurs when a message is received during the call. Live transcripts and function calls will be sent through this.
+  - `error(Swift.Error)`: Triggered if there's an error during the call setup or execution.
+
+### Implementing in Your Project
+
+To see these methods in action, refer to our example files:
+
+- **SwiftUI Example:** Check the `SwiftUICallView.swift` file in the Example folder. This file demonstrates the integration of these methods in a SwiftUI view.
+- **UIKit Example:** Look at the `UIKitCallViewController.swift` file for an example of using the Vapi SDK within a UIKit view controller.
+
+These examples will guide you through effectively implementing and managing voice calls in your iOS applications using the Vapi SDK.
 
 ## License
 

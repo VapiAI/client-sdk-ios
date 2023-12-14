@@ -23,6 +23,7 @@ public final class Vapi: CallClientDelegate {
     public enum Event {
         case callDidStart
         case callDidEnd
+        case messageReceived([String: Any])
         case error(Swift.Error)
     }
     
@@ -51,7 +52,7 @@ public final class Vapi: CallClientDelegate {
     public init(configuration: Configuration) {
         self.configuration = configuration
         
-        Daily.setLogLevel(.error)
+        Daily.setLogLevel(.off)
     }
     
     public convenience init(clientToken: String) {
@@ -150,7 +151,6 @@ public final class Vapi: CallClientDelegate {
         Task { [request] in
             do {
                 let response: WebCallResponse = try await networkManager.perform(request: request)
-                print(response)
                 joinCall(with: response.webCallUrl)
             } catch {
                 callDidFail(with: error)
@@ -211,6 +211,20 @@ public final class Vapi: CallClientDelegate {
             break
         default:
             break
+        }
+    }
+    
+    public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
+        do {
+            // Parse the JSON data
+            if let messageDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                // Create a custom event or use an existing one
+                let event = Event.appMessageReceived(messageDict, from: participantID)
+                // Emit the event
+                self.eventSubject.send(event)
+            }
+        } catch {
+            print("Error parsing app message: \(error.localizedDescription)")
         }
     }
 }
