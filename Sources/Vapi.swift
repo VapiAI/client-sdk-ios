@@ -150,6 +150,7 @@ public final class Vapi: CallClientDelegate {
         Task { [request] in
             do {
                 let response: WebCallResponse = try await networkManager.perform(request: request)
+                print(response)
                 joinCall(with: response.webCallUrl)
             } catch {
                 callDidFail(with: error)
