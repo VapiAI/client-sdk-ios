@@ -7,6 +7,7 @@
 
 import Foundation
 
-struct WebCallResponse: Decodable {
+public struct WebCallResponse: Decodable {
     let webCallUrl: URL
+    let id: String
 }
