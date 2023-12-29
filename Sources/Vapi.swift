@@ -65,24 +65,24 @@ public final class Vapi: CallClientDelegate {
     
     // MARK: - Instance Methods
     
-    public func start(assistantId: String) throws {
+    public func start(assistantId: String) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
         let body = ["assistantId": assistantId]
         
-        self.startCall(body: body)
+        return try await self.startCall(body: body)
     }
     
-    public func start(assistant: [String: Any]) throws {
+    public func start(assistant: [String: Any]) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
         let body = ["assistant": assistant]
         
-        self.startCall(body: body)
+        return try await self.startCall(body: body)
     }
     
     public func stop() {
@@ -133,10 +133,10 @@ public final class Vapi: CallClientDelegate {
         return request
     }
     
-    private func startCall(body: [String: Any]) {
+    private func startCall(body: [String: Any]) async throws -> WebCallResponse {
         guard let url = makeURL(for: "/call/web") else {
             callDidFail(with: VapiError.invalidURL)
-            return
+            throw VapiError.customError("Unable to create web call")
         }
         
         var request = makeURLRequest(for: url)
@@ -145,16 +145,16 @@ public final class Vapi: CallClientDelegate {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
             self.callDidFail(with: error)
-            return
+            throw VapiError.customError(error.localizedDescription)
         }
         
-        Task { [request] in
-            do {
-                let response: WebCallResponse = try await networkManager.perform(request: request)
-                joinCall(with: response.webCallUrl)
-            } catch {
-                callDidFail(with: error)
-            }
+        do {
+            let response: WebCallResponse = try await networkManager.perform(request: request)
+            joinCall(with: response.webCallUrl)
+            return response
+        } catch {
+            callDidFail(with: error)
+            throw VapiError.customError(error.localizedDescription)
         }
     }
     
