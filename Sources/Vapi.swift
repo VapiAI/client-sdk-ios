@@ -23,7 +23,7 @@ public final class Vapi: CallClientDelegate {
     public enum Event {
         case callDidStart
         case callDidEnd
-        case messageReceived([String: Any])
+        case messageReceived(AppMessage)
         case error(Swift.Error)
     }
     
@@ -158,6 +158,22 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
+    private func unescapeAppMessage(_ jsonData: Data) -> Data {
+        guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return jsonData
+        }
+
+        // Remove the leading and trailing double quotes
+        let trimmedString = jsonString.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        // Replace escaped backslashes
+        let unescapedString = trimmedString.replacingOccurrences(of: "\\\\", with: "\\")
+        // Replace escaped double quotes
+        let unescapedJSON = unescapedString.replacingOccurrences(of: "\\\"", with: "\"")
+
+        let unescapedData = unescapedJSON.data(using: .utf8) ?? jsonData
+        return unescapedData
+    }
+    
     // MARK: - CallClientDelegate
     
     func callDidJoin() {
@@ -217,12 +233,13 @@ public final class Vapi: CallClientDelegate {
     public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
         do {
             // Parse the JSON data
-            if let messageDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-                let event = Event.messageReceived(messageDict)
-                self.eventSubject.send(event)
-            }
+            let unescapedData = unescapeAppMessage(jsonData)
+            let appMessage = try JSONDecoder().decode(AppMessage.self, from: unescapedData)
+            let event = Event.messageReceived(appMessage)
+            eventSubject.send(event)
         } catch {
-            print("Error parsing app message: \(error.localizedDescription)")
+            let messageText = String(data: jsonData, encoding: .utf8)
+            print("Error parsing app message \"\(messageText)\": \(error.localizedDescription)")
         }
     }
 }
