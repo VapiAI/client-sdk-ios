@@ -10,7 +10,7 @@ class CallViewController: UIViewController {
     }
 
     private func setupVapi() {
-        let config = Vapi.Configuration(clientToken: "your_client_token")
+        let config = Vapi.Configuration(publicKey: "your_public_key")
         vapi = Vapi(configuration: config)
 
         vapi?.eventPublisher.sink { [weak self] event in
