@@ -23,7 +23,9 @@ public final class Vapi: CallClientDelegate {
     public enum Event {
         case callDidStart
         case callDidEnd
-        case messageReceived(AppMessage)
+        case transcript(Transcript)
+        case functionCall(FunctionCall)
+        case hang
         case error(Swift.Error)
     }
     
@@ -232,10 +234,40 @@ public final class Vapi: CallClientDelegate {
     
     public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
         do {
-            // Parse the JSON data
+            let decoder = JSONDecoder()
             let unescapedData = unescapeAppMessage(jsonData)
-            let appMessage = try JSONDecoder().decode(AppMessage.self, from: unescapedData)
-            let event = Event.messageReceived(appMessage)
+            // Parse the JSON data generically to determine the type of event
+            let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
+
+            // Parse the JSON data again, this time using the specific type
+            let event: Event
+            switch appMessage.type {
+            case .functionCall:
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+                }
+                
+                guard let functionCallDictionary = messageDictionary["functionCall"] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing functionCall")
+                }
+                
+                guard let name = functionCallDictionary[FunctionCall.CodingKeys.name.stringValue] as? String else {
+                    throw VapiError.decodingError(message: "App message missing name")
+                }
+                
+                guard let parameters = functionCallDictionary[FunctionCall.CodingKeys.parameters.stringValue] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing parameters")
+                }
+                
+
+                let functionCall = FunctionCall(name: name, parameters: parameters)
+                event = Event.functionCall(functionCall)
+            case .hang:
+                event = Event.hang
+            case .transcript:
+                let transcript = try decoder.decode(Transcript.self, from: unescapedData)
+                event = Event.transcript(transcript)
+            }
             eventSubject.send(event)
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)
