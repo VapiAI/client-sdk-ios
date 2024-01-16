@@ -160,9 +160,9 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
-    private func unescapeAppMessage(_ jsonData: Data) -> Data {
+    private func unescapeAppMessage(_ jsonData: Data) -> (Data, String?) {
         guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-            return jsonData
+            return (jsonData, nil)
         }
 
         // Remove the leading and trailing double quotes
@@ -173,15 +173,14 @@ public final class Vapi: CallClientDelegate {
         let unescapedJSON = unescapedString.replacingOccurrences(of: "\\\"", with: "\"")
 
         let unescapedData = unescapedJSON.data(using: .utf8) ?? jsonData
-        return unescapedData
+        return (unescapedData, unescapedJSON)
     }
     
     // MARK: - CallClientDelegate
     
     func callDidJoin() {
         print("Successfully joined call.")
-        
-        self.eventSubject.send(.callDidStart)
+        // Note: the call start event will be sent once the assistant has joined and is listening
     }
     
     func callDidLeave() {
@@ -212,7 +211,7 @@ public final class Vapi: CallClientDelegate {
             let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
             
             Task {
-                try await self.call?.sendAppMessage(json: jsonData, to: .all)
+                try await call?.sendAppMessage(json: jsonData, to: .all)
             }
         } catch {
             print("Error sending message: \(error.localizedDescription)")
@@ -234,9 +233,16 @@ public final class Vapi: CallClientDelegate {
     
     public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
         do {
-            let decoder = JSONDecoder()
-            let unescapedData = unescapeAppMessage(jsonData)
+            let (unescapedData, unescapedString) = unescapeAppMessage(jsonData)
+            
+            // Detect listening message first since it's a string rather than JSON
+            guard unescapedString != "listening" else {
+                eventSubject.send(.callDidStart)
+                return
+            }
+            
             // Parse the JSON data generically to determine the type of event
+            let decoder = JSONDecoder()
             let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
 
             // Parse the JSON data again, this time using the specific type
