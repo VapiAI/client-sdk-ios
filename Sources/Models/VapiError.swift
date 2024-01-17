@@ -12,4 +12,5 @@ public enum VapiError: Swift.Error {
     case customError(String)
     case existingCallInProgress
     case noCallInProgress
+    case decodingError(message: String, response: String? = nil)
 }

@@ -23,7 +23,9 @@ public final class Vapi: CallClientDelegate {
     public enum Event {
         case callDidStart
         case callDidEnd
-        case messageReceived([String: Any])
+        case transcript(Transcript)
+        case functionCall(FunctionCall)
+        case hang
         case error(Swift.Error)
     }
     
@@ -158,6 +160,22 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
+    private func unescapeAppMessage(_ jsonData: Data) -> Data {
+        guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return jsonData
+        }
+
+        // Remove the leading and trailing double quotes
+        let trimmedString = jsonString.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        // Replace escaped backslashes
+        let unescapedString = trimmedString.replacingOccurrences(of: "\\\\", with: "\\")
+        // Replace escaped double quotes
+        let unescapedJSON = unescapedString.replacingOccurrences(of: "\\\"", with: "\"")
+
+        let unescapedData = unescapedJSON.data(using: .utf8) ?? jsonData
+        return unescapedData
+    }
+    
     // MARK: - CallClientDelegate
     
     func callDidJoin() {
@@ -216,13 +234,44 @@ public final class Vapi: CallClientDelegate {
     
     public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
         do {
-            // Parse the JSON data
-            if let messageDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-                let event = Event.messageReceived(messageDict)
-                self.eventSubject.send(event)
+            let decoder = JSONDecoder()
+            let unescapedData = unescapeAppMessage(jsonData)
+            // Parse the JSON data generically to determine the type of event
+            let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
+
+            // Parse the JSON data again, this time using the specific type
+            let event: Event
+            switch appMessage.type {
+            case .functionCall:
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+                }
+                
+                guard let functionCallDictionary = messageDictionary["functionCall"] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing functionCall")
+                }
+                
+                guard let name = functionCallDictionary[FunctionCall.CodingKeys.name.stringValue] as? String else {
+                    throw VapiError.decodingError(message: "App message missing name")
+                }
+                
+                guard let parameters = functionCallDictionary[FunctionCall.CodingKeys.parameters.stringValue] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing parameters")
+                }
+                
+
+                let functionCall = FunctionCall(name: name, parameters: parameters)
+                event = Event.functionCall(functionCall)
+            case .hang:
+                event = Event.hang
+            case .transcript:
+                let transcript = try decoder.decode(Transcript.self, from: unescapedData)
+                event = Event.transcript(transcript)
             }
+            eventSubject.send(event)
         } catch {
-            print("Error parsing app message: \(error.localizedDescription)")
+            let messageText = String(data: jsonData, encoding: .utf8)
+            print("Error parsing app message \"\(messageText)\": \(error.localizedDescription)")
         }
     }
 }
