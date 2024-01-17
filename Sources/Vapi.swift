@@ -11,12 +11,12 @@ public final class Vapi: CallClientDelegate {
     /// This configuration is serializable via `Codable`.
     public struct Configuration: Codable, Hashable, Sendable {
         public var host: String
-        public var clientToken: String
+        public var publicKey: String
         fileprivate static let defaultHost = "api.vapi.ai"
         
-        init(clientToken: String, host: String) {
+        init(publicKey: String, host: String) {
             self.host = host
-            self.clientToken = clientToken
+            self.publicKey = publicKey
         }
     }
     
@@ -38,8 +38,8 @@ public final class Vapi: CallClientDelegate {
     
     // MARK: - Computed Properties
     
-    private var clientToken: String {
-        configuration.clientToken
+    private var publicKey: String {
+        configuration.publicKey
     }
     
     /// A Combine publisher that clients can subscribe to for API events.
@@ -55,12 +55,12 @@ public final class Vapi: CallClientDelegate {
         Daily.setLogLevel(.off)
     }
     
-    public convenience init(clientToken: String) {
-        self.init(configuration: .init(clientToken: clientToken, host: Configuration.defaultHost))
+    public convenience init(publicKey: String) {
+        self.init(configuration: .init(publicKey: publicKey, host: Configuration.defaultHost))
     }
     
-    public convenience init(clientToken: String, host: String? = nil) {
-        self.init(configuration: .init(clientToken: clientToken, host: host ?? Configuration.defaultHost))
+    public convenience init(publicKey: String, host: String? = nil) {
+        self.init(configuration: .init(publicKey: publicKey, host: host ?? Configuration.defaultHost))
     }
     
     // MARK: - Instance Methods
@@ -128,7 +128,7 @@ public final class Vapi: CallClientDelegate {
     private func makeURLRequest(for url: URL) -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(clientToken)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(publicKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         return request
     }
