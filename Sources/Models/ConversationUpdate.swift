@@ -12,10 +12,5 @@ public struct Message: Codable {
 }
 
 public struct ConversationUpdate: Codable {
-    public enum MessageType: String, Codable {
-        case conversationUpdate = "conversation-update"
-    }
-    
-    public let type: MessageType
     public let conversation: [Message]
 }
