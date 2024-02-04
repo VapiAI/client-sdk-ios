@@ -1,53 +1,162 @@
 import SwiftUI
 import Vapi
-
-struct CallView: View {
-    @StateObject private var callManager = CallManager()
-
-    var body: some View {
-        VStack {
-            if callManager.isOnCall {
-                Text("In Call")
-                Button("Hang Up", action: callManager.endCall)
-            } else {
-                Button("Start Call", action: callManager.startCall)
-            }
-        }
-        .onAppear {
-            callManager.setup()
-        }
-    }
-}
+import Combine
 
 class CallManager: ObservableObject {
-    @Published var isOnCall = false
-    private var vapi: Vapi?
-
-    func setup() {
-        let config = Vapi.Configuration(publicKey: "your_public_key")
-        vapi = Vapi(configuration: config)
-
-        vapi?.eventPublisher.sink { [weak self] event in
-            switch event {
-            case .callDidStart:
-                self?.isOnCall = true
-            case .callDidEnd:
-                self?.isOnCall = false
-            default:
-                break
-            }
-        }.store(in: &cancellables)
+    enum CallState {
+        case started, loading, ended
     }
 
-    func startCall() {
+    @Published var callState: CallState = .ended
+    var vapiEvents = [Vapi.Event]()
+    private var cancellables = Set<AnyCancellable>()
+    let vapi: Vapi
+
+    init() {
+        vapi = Vapi(
+            publicKey: "<Your Vapi Public Key>"
+        )
+    }
+
+    func setupVapi() {
+        vapi.eventPublisher
+            .sink { [weak self] event in
+                self?.vapiEvents.append(event)
+                switch event {
+                case .callDidStart:
+                    self?.callState = .started
+                case .callDidEnd:
+                    self?.callState = .ended
+                case .speechUpdate:
+                    print(event)
+                case .conversationUpdate:
+                    print(event)
+                case .functionCall:
+                    print(event)
+                case .hang:
+                    print(event)
+                case .metadata:
+                    print(event)
+                case .transcript:
+                    print(event)
+                case .error(let error):
+                    print("Error: \(error)")
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    @MainActor
+    func handleCallAction() async {
+        if callState == .ended {
+            await startCall()
+        } else {
+            endCall()
+        }
+    }
+
+    @MainActor
+    func startCall() async {
+        callState = .loading
+        let assistant = [
+            "model": [
+                "provider": "openai",
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    ["role":"system", "content":"You are an assistant."]
+                ],
+            ],
+            "firstMessage": "Hey there",
+            "voice": "jennifer-playht"
+        ] as [String : Any]
         do {
-            try vapi?.start(assistantId: "your_assistant_id")
+            try await vapi.start(assistant: assistant)
         } catch {
             print("Error starting call: \(error)")
+            callState = .ended
         }
     }
 
     func endCall() {
-        vapi?.stop()
+        vapi.stop()
+    }
+}
+
+struct ContentView: View {
+    @StateObject private var callManager = CallManager()
+
+    var body: some View {
+        ZStack {
+            // Background gradient
+            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.7), Color.purple.opacity(0.7)]), startPoint: .top, endPoint: .bottom)
+                .edgesIgnoringSafeArea(.all)
+
+            VStack(spacing: 20) {
+                Text("Vapi Call Interface")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Text(callManager.callStateText)
+                    .font(.title)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(callManager.callStateColor)
+                    .cornerRadius(10)
+
+                Spacer()
+
+                Button(action: {
+                    Task {
+                        await callManager.handleCallAction()
+                    }
+                }) {
+                    Text(callManager.buttonText)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(callManager.buttonColor)
+                        .cornerRadius(10)
+                }
+                .disabled(callManager.callState == .loading)
+                .padding(.horizontal, 40)
+
+                Spacer()
+            }
+        }
+        .onAppear {
+            callManager.setupVapi()
+        }
+    }
+}
+
+extension CallManager {
+    var callStateText: String {
+        switch callState {
+        case .started: return "Call in Progress"
+        case .loading: return "Connecting..."
+        case .ended: return "Call Off"
+        }
+    }
+
+    var callStateColor: Color {
+        switch callState {
+        case .started: return .green.opacity(0.8)
+        case .loading: return .orange.opacity(0.8)
+        case .ended: return .gray.opacity(0.8)
+        }
+    }
+
+    var buttonText: String {
+        callState == .loading ? "Loading..." : (callState == .ended ? "Start Call" : "End Call")
+    }
+
+    var buttonColor: Color {
+        callState == .loading ? .gray : (callState == .ended ? .green : .red)
     }
 }
