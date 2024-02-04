@@ -22,3 +22,5 @@ public struct Transcript: Codable {
     public let transcriptType: TranscriptType
     public let transcript: String
 }
+
+

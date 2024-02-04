@@ -12,6 +12,9 @@ struct AppMessage: Codable {
         case hang
         case functionCall = "function-call"
         case transcript
+        case speechUpdate = "speech-update"
+        case metadata
+        case conversationUpdated = "conversation-updated"
     }
     
     let type: MessageType

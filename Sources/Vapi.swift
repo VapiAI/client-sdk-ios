@@ -19,12 +19,15 @@ public final class Vapi: CallClientDelegate {
             self.publicKey = publicKey
         }
     }
-    
+
     public enum Event {
         case callDidStart
         case callDidEnd
         case transcript(Transcript)
         case functionCall(FunctionCall)
+        case speechUpdate(SpeechUpdate)
+        case metadata(Metadata)
+        case conversationUpdate(ConversationUpdate)
         case hang
         case error(Swift.Error)
     }
@@ -67,22 +70,22 @@ public final class Vapi: CallClientDelegate {
     
     // MARK: - Instance Methods
     
-    public func start(assistantId: String) async throws -> WebCallResponse {
+    public func start(assistantId: String, metadata: [String: Any] = [:]) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
-        let body = ["assistantId": assistantId]
+        let body = ["assistantId": assistantId, "metadata": metadata] as [String: Any]
         
         return try await self.startCall(body: body)
     }
     
-    public func start(assistant: [String: Any]) async throws -> WebCallResponse {
+    public func start(assistant: [String: Any], metadata: [String: Any] = [:]) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
-        let body = ["assistant": assistant]
+        let body = ["assistant": assistant, "metadata": metadata]
         
         return try await self.startCall(body: body)
     }
@@ -95,6 +98,14 @@ public final class Vapi: CallClientDelegate {
                 self.callDidFail(with: error)
             }
         }
+    }
+
+    public func send(json: Data) async throws {
+        guard let call = call else {
+            throw VapiError.noCallInProgress
+        }
+        
+        try await call.sendAppMessage(json: json, to: .all)
     }
     
     private func joinCall(with url: URL) {
@@ -265,7 +276,7 @@ public final class Vapi: CallClientDelegate {
                     throw VapiError.decodingError(message: "App message missing parameters")
                 }
                 
-
+                
                 let functionCall = FunctionCall(name: name, parameters: parameters)
                 event = Event.functionCall(functionCall)
             case .hang:
@@ -273,6 +284,15 @@ public final class Vapi: CallClientDelegate {
             case .transcript:
                 let transcript = try decoder.decode(Transcript.self, from: unescapedData)
                 event = Event.transcript(transcript)
+            case .speechUpdate:
+                let speechUpdate = try decoder.decode(SpeechUpdate.self, from: unescapedData)
+                event = Event.speechUpdate(speechUpdate)
+            case .metadata:
+                let metadata = try decoder.decode(Metadata.self, from: unescapedData)
+                event = Event.metadata(metadata)
+            case .conversationUpdated:
+                let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
+                event = Event.conversationUpdate(conv)
             }
             eventSubject.send(event)
         } catch {
