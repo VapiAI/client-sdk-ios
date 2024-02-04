@@ -172,8 +172,6 @@ public final class Vapi: CallClientDelegate {
     }
     
     private func unescapeAppMessage(_ jsonData: Data) -> (Data, String?) {  
-        print("Escaped JSON:")
-        print(jsonData)
         guard let jsonString = String(data: jsonData, encoding: .utf8) else {
             return (jsonData, nil)
         }
@@ -184,11 +182,8 @@ public final class Vapi: CallClientDelegate {
         let unescapedString = trimmedString.replacingOccurrences(of: "\\\\", with: "\\")
         // Replace escaped double quotes
         let unescapedJSON = unescapedString.replacingOccurrences(of: "\\\"", with: "\"")
-        print("Unescaped JSON:")
-        print(unescapedJSON)
+
         let unescapedData = unescapedJSON.data(using: .utf8) ?? jsonData
-        print("Unescaped Data:")
-        print(unescapedData)
 
         return (unescapedData, unescapedJSON)
     }
@@ -295,7 +290,7 @@ public final class Vapi: CallClientDelegate {
             case .metadata:
                 let metadata = try decoder.decode(Metadata.self, from: unescapedData)
                 event = Event.metadata(metadata)
-            case .conversationUpdated:
+            case .conversationUpdate:
                 let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
                 event = Event.conversationUpdate(conv)
             }
