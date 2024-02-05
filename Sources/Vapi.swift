@@ -103,7 +103,7 @@ public final class Vapi: CallClientDelegate {
     public func send(message: [String : Any]) async throws {
         // Convert the message dictionary to JSON Data
         let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
-        
+        print(jsonData)
         // Assuming call.sendAppMessage is designed to accept JSON data and a target destination
         try await self.call?.sendAppMessage(json: jsonData, to: .all)
     }
