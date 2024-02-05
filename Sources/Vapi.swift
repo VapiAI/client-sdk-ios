@@ -103,11 +103,11 @@ public final class Vapi: CallClientDelegate {
     public func send(jsonString: String) async throws {
         // First, ensure the JSON string is correctly encoded as Data
         guard let jsonData = jsonString.data(using: .utf8) else {
-            throw VapiError.invalidJsonData // Define this error to handle encoding failures
+            throw VapiError.invalidJsonData
         }
 
         // Now, send the jsonData using the sendAppMessage method
-        try await send(jsonData: jsonData, to: .all)
+        try await send(jsonData: jsonData)
     }
 
     private func send(jsonData: Data) async throws {

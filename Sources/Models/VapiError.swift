@@ -13,4 +13,5 @@ public enum VapiError: Swift.Error {
     case existingCallInProgress
     case noCallInProgress
     case decodingError(message: String, response: String? = nil)
+    case invalidJsonData
 }
