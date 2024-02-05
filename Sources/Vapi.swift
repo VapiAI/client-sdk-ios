@@ -100,12 +100,23 @@ public final class Vapi: CallClientDelegate {
         }
     }
 
-    public func send(json: Data) async throws {
+    public func send(jsonString: String) async throws {
+        // First, ensure the JSON string is correctly encoded as Data
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            throw VapiError.invalidJsonData // Define this error to handle encoding failures
+        }
+
+        // Now, send the jsonData using the sendAppMessage method
+        try await send(jsonData: jsonData)
+    }
+
+    private func send(jsonData: Data) async throws {
         guard let call = call else {
             throw VapiError.noCallInProgress
         }
         
-        try await call.sendAppMessage(json: json, to: .all)
+        // Sending JSON data directly without modification
+        try await call.sendAppMessage(json: jsonData, to: .all)
     }
     
     private func joinCall(with url: URL) {
