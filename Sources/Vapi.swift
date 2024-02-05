@@ -107,7 +107,7 @@ public final class Vapi: CallClientDelegate {
         }
 
         // Now, send the jsonData using the sendAppMessage method
-        try await send(jsonData: jsonData)
+        try await send(jsonData: jsonData, to: .all)
     }
 
     private func send(jsonData: Data) async throws {
