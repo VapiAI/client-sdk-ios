@@ -2,7 +2,17 @@ import Combine
 import Daily
 import Foundation
 
+// Define the nested message structure
+public struct VapiMessageContent: Encodable {
+    public let role: String
+    public let content: String
+}
 
+// Define the top-level app message structure
+public struct VapiMessage: Encodable {
+    public let type: String
+    public let message: VapiMessageContent
+}
 
 public final class Vapi: CallClientDelegate {
     
@@ -32,18 +42,6 @@ public final class Vapi: CallClientDelegate {
         case conversationUpdate(ConversationUpdate)
         case hang
         case error(Swift.Error)
-    }
-    
-    // Define the nested message structure
-    public struct MessageContent: Encodable {
-        public let role: String
-        public let content: String
-    }
-
-    // Define the top-level app message structure
-    public struct VapiMessage: Encodable {
-        public let type: String
-        public let message: MessageContent
     }
     
     // MARK: - Properties
