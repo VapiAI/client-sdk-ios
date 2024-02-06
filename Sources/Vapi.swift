@@ -2,6 +2,8 @@ import Combine
 import Daily
 import Foundation
 
+
+
 public final class Vapi: CallClientDelegate {
     
     // MARK: - Supporting Types
@@ -30,6 +32,18 @@ public final class Vapi: CallClientDelegate {
         case conversationUpdate(ConversationUpdate)
         case hang
         case error(Swift.Error)
+    }
+    
+    // Define the nested message structure
+    public struct MessageContent: Encodable {
+        public let role: String
+        public let content: String
+    }
+
+    // Define the top-level app message structure
+    public struct VapiMessage: Encodable {
+        public let type: String
+        public let message: MessageContent
     }
     
     // MARK: - Properties
@@ -100,24 +114,23 @@ public final class Vapi: CallClientDelegate {
         }
     }
 
-    public func send(message: [String: Any]) async throws {
+    public func send(message: VapiMessage) async throws {
         do {
-            // Convert the message dictionary to JSON Data
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
-            
-            // Debugging: Print the JSON data to verify its format (optional)
-            if let jsonString = String(data: jsonData, encoding: .utf8) {
-                print(jsonString)
-            }
-            
-            let message: [String: Any] = ["message": "playable"]
-            let jsonDataTwo = try JSONSerialization.data(withJSONObject: message, options: [])
-            try await self.call?.sendAppMessage(json: jsonDataTwo, to: .all)
-        } catch {
-            // Handle JSON serialization error
-            print("Error serializing message to JSON: \(error)")
-            throw error // Re-throw the error to be handled by the caller
-        }
+          // Use JSONEncoder to convert the message to JSON Data
+          let jsonData = try JSONEncoder().encode(message)
+          
+          // Debugging: Print the JSON data to verify its format (optional)
+          if let jsonString = String(data: jsonData, encoding: .utf8) {
+              print(jsonString)
+          }
+          
+          // Send the JSON data to all targets
+          try await self.call?.sendAppMessage(json: jsonData, to: .all)
+      } catch {
+          // Handle encoding error
+          print("Error encoding message to JSON: \(error)")
+          throw error // Re-throw the error to be handled by the caller
+      }
     }
     
     
