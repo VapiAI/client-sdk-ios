@@ -3,7 +3,7 @@ import Daily
 import Foundation
 
 // Define the nested message structure
-public struct VapiMessageContent: Encodable {
+struct VapiMessageContent: Encodable {
     public let role: String
     public let content: String
 }
@@ -11,7 +11,12 @@ public struct VapiMessageContent: Encodable {
 // Define the top-level app message structure
 public struct VapiMessage: Encodable {
     public let type: String
-    public let message: VapiMessageContent
+    let message: VapiMessageContent
+
+    public init(type: String, role: String, content: String) {
+        self.type = type
+        self.message = VapiMessageContent(role: role, content: content)
+    }
 }
 
 public final class Vapi: CallClientDelegate {
