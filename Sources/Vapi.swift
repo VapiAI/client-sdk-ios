@@ -110,15 +110,17 @@ public final class Vapi: CallClientDelegate {
                 print(jsonString)
             }
             
-            // Assuming call.sendAppMessage is designed to accept JSON data and a target destination
-            // Send the JSON data to all targets
-            try await self.call?.sendAppMessage(json: jsonData, to: .all)
+            let message: [String: Any] = ["message": "playable"]
+            let jsonDataTwo = try JSONSerialization.data(withJSONObject: message, options: [])
+            try await self.call?.sendAppMessage(json: jsonDataTwo, to: .all)
         } catch {
             // Handle JSON serialization error
             print("Error serializing message to JSON: \(error)")
             throw error // Re-throw the error to be handled by the caller
         }
     }
+    
+    
     
     private func joinCall(with url: URL) {
         Task { @MainActor in
