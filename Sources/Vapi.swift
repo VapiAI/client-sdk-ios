@@ -162,8 +162,13 @@ public final class Vapi: CallClientDelegate {
     
     private func makeURL(for path: String) -> URL? {
         var components = URLComponents()
-        // Check if the host is localhost, set the scheme to http; otherwise, set it to https
-        components.scheme = configuration.host == "localhost" ? "http" : "https"
+        // Check if the host is localhost, set the scheme to http and port to 3001; otherwise, set the scheme to https
+        if configuration.host == "localhost" {
+            components.scheme = "http"
+            components.port = 3001
+        } else {
+            components.scheme = "https"
+        }
         components.host = configuration.host
         components.path = path
         return components.url
