@@ -245,6 +245,12 @@ public final class Vapi: CallClientDelegate {
         self.call = nil
     }
     
+    public setLocalAudioMute(_ mute: Bool) {
+        Task {
+            await call?.setLocalAudio(!mute)
+        }
+    }
+
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
         let isVapiSpeaker = participant.info.username == "Vapi Speaker"
