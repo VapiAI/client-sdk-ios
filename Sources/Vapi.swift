@@ -245,7 +245,7 @@ public final class Vapi: CallClientDelegate {
         self.call = nil
     }
     
-    public setLocalAudioMute(_ mute: Bool) {
+    public func setLocalAudioMute(_ mute: Bool) {
         Task {
             await call?.setLocalAudio(!mute)
         }
