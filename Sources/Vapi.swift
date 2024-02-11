@@ -141,7 +141,7 @@ public final class Vapi: CallClientDelegate {
             throw VapiError.noCallInProgress
         }
         do {
-            let isCurrentlyMuted = call.isLocalAudioMuted(); // Ensure this works
+            let isCurrentlyMuted = call.isLocalAudioMuted();
             if isCurrentlyMuted {
                 try await call.unmuteLocalAudio()
                 print("Audio unmuted")
