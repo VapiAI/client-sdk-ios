@@ -136,8 +136,25 @@ public final class Vapi: CallClientDelegate {
       }
     }
     
-    
-    
+    public func toggleMute() async throws {
+        guard let call = this.call else {
+            throw VapiError.noCallInProgress
+        }
+        do {
+            let isCurrentlyMuted = call.isLocalAudioMuted(); // Ensure this works
+            if isCurrentlyMuted {
+                try await call.unmuteLocalAudio()
+                print("Audio unmuted")
+            } else {
+                try await call.muteLocalAudio()
+                print("Audio muted")
+            }
+        } catch {
+            print("Failed to toggle mute state: \(error)")
+            throw error
+        }
+    }
+
     private func joinCall(with url: URL) {
         Task { @MainActor in
             do {
@@ -245,12 +262,6 @@ public final class Vapi: CallClientDelegate {
         self.call = nil
     }
     
-    public func setLocalAudioMute(_ mute: Bool) {
-        Task {
-            await call?.setLocalAudio(!mute)
-        }
-    }
-
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
         let isVapiSpeaker = participant.info.username == "Vapi Speaker"
