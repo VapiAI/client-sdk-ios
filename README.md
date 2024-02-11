@@ -83,7 +83,15 @@ If you view the raw file contents of Info.plist, it should look like this:
   - This method ends an ongoing call.
   - It's an asynchronous operation, ensuring the call is properly disconnected.
 
-### 3. Handling Events
+### 3. Muting a Call
+
+- **Method:** `toggleMute()`
+- **Description:**
+    - This method mutes or unmutes an ongoing call. 
+    - Parameters: `muted` is a boolean value indicating whether the audio should be muted.
+    - `toggleMute(true)` will mute the audio and `toggleMute(false)` will unmute audio. 
+
+### 4. Handling Events
 
 - **Overview:** The SDK provides various events that you can listen to for handling different aspects of the call lifecycle and interactions.
 - **Key Events:** 
