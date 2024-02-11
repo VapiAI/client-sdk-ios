@@ -136,8 +136,24 @@ public final class Vapi: CallClientDelegate {
       }
     }
     
-    
-    
+    public func toggleMute(shouldMute: Bool) async throws {
+        guard let call = this.call else {
+            throw VapiError.noCallInProgress
+        }
+        do {
+            if shouldMute {
+                try await call.muteLocalAudio()
+                print("Audio unmuted")
+            } else {
+                try await call.unmuteLocalAudio()
+                print("Audio unmuted")
+            }
+        } catch {
+            print("Failed to change mute state: \(error)")
+            throw error
+        }
+    }
+
     private func joinCall(with url: URL) {
         Task { @MainActor in
             do {
