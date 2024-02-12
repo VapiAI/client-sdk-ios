@@ -163,12 +163,10 @@ public final class Vapi: CallClientDelegate {
             throw VapiError.noCallInProgress
         }
         
-        // Use the isMicrophoneMuted property to check the current state
         let shouldBeMuted = !self.isMicrophoneMuted
         
         do {
             try await call.setInputEnabled(.microphone, !shouldBeMuted)
-            // Update the mute state tracking
             self.isMicrophoneMuted = shouldBeMuted
             if shouldBeMuted {
                 print("Audio muted")
