@@ -158,7 +158,7 @@ public final class Vapi: CallClientDelegate {
         }
     }
 
-    public func toggleMute() async throws {
+    public func isMuted() async throws {
         guard let call = self.call else {
             throw VapiError.noCallInProgress
         }
