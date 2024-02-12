@@ -85,11 +85,13 @@ If you view the raw file contents of Info.plist, it should look like this:
 
 ### 3. Muting a Call
 
-- **Method:** `toggleMute()`
+- **Methods:** 
+  - `setMuted()`
+  - `isMuted()`
 - **Description:**
-    - This method mutes or unmutes an ongoing call. 
+    - Use these methods to mute or unmute an ongoing call. 
     - Parameters: `muted` is a boolean value indicating whether the audio should be muted.
-    - `toggleMute(true)` will mute the audio and `toggleMute(false)` will unmute audio. 
+    - `setMuted(true)` will mute the audio and `setMuted(false)` will unmute audio. 
 
 ### 4. Handling Events
 
