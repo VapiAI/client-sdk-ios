@@ -91,7 +91,7 @@ If you view the raw file contents of Info.plist, it should look like this:
 - **Description:**
     - Use these methods to mute or unmute an ongoing call. 
     - Parameters: `muted` is a boolean value indicating whether the audio should be muted.
-    - `setMuted(false)` will mute the audio and `setMuted(true)` will unmute audio. testing
+    - `setMuted(false)` will mute the audio and `setMuted(true)` will unmute audio.
 
 ### 4. Handling Events
 
