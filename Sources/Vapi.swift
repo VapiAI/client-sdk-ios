@@ -136,7 +136,6 @@ public final class Vapi: CallClientDelegate {
       }
     }
     
-
     private var isMicrophoneMuted: Bool = false
 
     public func setMuted(_ muted: Bool) async throws {

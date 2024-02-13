@@ -17,7 +17,7 @@ class CallManager: ObservableObject {
             publicKey: "<Your Vapi Public Key>"
         )
     }
-    
+
     func setupVapi() {
         vapi.eventPublisher
             .sink { [weak self] event in
