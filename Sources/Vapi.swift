@@ -136,8 +136,48 @@ public final class Vapi: CallClientDelegate {
       }
     }
     
-    
-    
+    private var isMicrophoneMuted: Bool = false
+
+    public func setMuted(_ muted: Bool) async throws {
+        guard let call = self.call else {
+            throw VapiError.noCallInProgress
+        }
+        
+        do {
+            try await call.setInputEnabled(.microphone, !muted)
+            self.isMicrophoneMuted = muted
+            if muted {
+                print("Audio muted")
+            } else {
+                print("Audio unmuted")
+            }
+        } catch {
+            print("Failed to set mute state: \(error)")
+            throw error
+        }
+    }
+
+    public func isMuted() async throws {
+        guard let call = self.call else {
+            throw VapiError.noCallInProgress
+        }
+        
+        let shouldBeMuted = !self.isMicrophoneMuted
+        
+        do {
+            try await call.setInputEnabled(.microphone, !shouldBeMuted)
+            self.isMicrophoneMuted = shouldBeMuted
+            if shouldBeMuted {
+                print("Audio muted")
+            } else {
+                print("Audio unmuted")
+            }
+        } catch {
+            print("Failed to toggle mute state: \(error)")
+            throw error
+        }
+    }
+
     private func joinCall(with url: URL) {
         Task { @MainActor in
             do {
