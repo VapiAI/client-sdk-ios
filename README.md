@@ -70,11 +70,12 @@ If you view the raw file contents of Info.plist, it should look like this:
 ### 1. Starting a Call
 
 - **Methods:** 
-  - `start(assistantId: String)`
-  - `start(assistant: [String: Any])`
+  - `start(assistantId: String, assistantOverrides: [String: Any] = [:])`
+  - `start(assistant: [String: Any], assistantOverrides: [String: Any] = [:])`
 - **Description:** 
   - Use these methods to initiate a new call. You can either start a call by passing an `assistantId` or by providing an `assistant` dictionary with specific parameters.
   - These methods throw an error if there's already an ongoing call to ensure that only one call is active at any time.
+  - The `assistantOverrides` parameter is optional and allows you to override an assistant's default settings or set variables. For example, if the first message is "Hello {{name}}", you can set `assistantOverrides` to `["variableValues": ["name": "Alice"]]` to replace `{{name}}` with `Alice`.
 
 ### 2. Stopping a Call
 
