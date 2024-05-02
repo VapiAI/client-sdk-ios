@@ -87,23 +87,31 @@ public final class Vapi: CallClientDelegate {
     
     // MARK: - Instance Methods
     
-    public func start(assistantId: String, metadata: [String: Any] = [:]) async throws -> WebCallResponse {
+    public func start(
+        assistantId: String, metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
+    ) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
-        let body = ["assistantId": assistantId, "metadata": metadata] as [String: Any]
+        let body = [
+            "assistantId": assistantId, "metadata": metadata, "assistantOverrides": assistantOverrides
+        ] as [String: Any]
         
         return try await self.startCall(body: body)
     }
     
-    public func start(assistant: [String: Any], metadata: [String: Any] = [:]) async throws -> WebCallResponse {
+    public func start(
+        assistant: [String: Any], metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
+    ) async throws -> WebCallResponse {
         guard self.call == nil else {
             throw VapiError.existingCallInProgress
         }
         
-        let body = ["assistant": assistant, "metadata": metadata]
-        
+        let body = [
+            "assistant": assistant, "metadata": metadata, "assistantOverrides": assistantOverrides
+        ] as [String: Any]
+
         return try await self.startCall(body: body)
     }
     
