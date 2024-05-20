@@ -9,5 +9,5 @@ import Foundation
 
 public struct WebCallResponse: Decodable {
     let webCallUrl: URL
-    let id: String
+    public let id: String
 }
