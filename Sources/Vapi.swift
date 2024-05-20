@@ -19,6 +19,8 @@ public struct VapiMessage: Encodable {
     }
 }
 
+
+
 public final class Vapi: CallClientDelegate {
     
     // MARK: - Supporting Types
