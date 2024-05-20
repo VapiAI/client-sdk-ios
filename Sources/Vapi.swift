@@ -69,6 +69,10 @@ public final class Vapi: CallClientDelegate {
         eventSubject.eraseToAnyPublisher()
     }
     
+    @MainActor public var localAudioLevel: Float? {
+        call?.localAudioLevel
+    }
+    
     // MARK: - Init
     
     public init(configuration: Configuration) {
@@ -272,6 +276,14 @@ public final class Vapi: CallClientDelegate {
         return (unescapedData, unescapedJSON)
     }
     
+    public func startLocalAudioLevelObserver() async throws {
+        do {
+            try await call?.startLocalAudioLevelObserver()
+        } catch {
+            throw error
+        }
+    }
+    
     // MARK: - CallClientDelegate
     
     func callDidJoin() {
@@ -381,7 +393,7 @@ public final class Vapi: CallClientDelegate {
             eventSubject.send(event)
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)
-            print("Error parsing app message \"\(messageText)\": \(error.localizedDescription)")
+            print("Error parsing app message \"\(messageText ?? "")\": \(error.localizedDescription)")
         }
     }
 }
