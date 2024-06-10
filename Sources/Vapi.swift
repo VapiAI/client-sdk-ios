@@ -73,6 +73,10 @@ public final class Vapi: CallClientDelegate {
         call?.localAudioLevel
     }
     
+    @MainActor public var remoteAudioLevel: Float? {
+        call?.remoteParticipantsAudioLevel.values.first
+    }
+    
     // MARK: - Init
     
     public init(configuration: Configuration) {
@@ -279,6 +283,14 @@ public final class Vapi: CallClientDelegate {
     public func startLocalAudioLevelObserver() async throws {
         do {
             try await call?.startLocalAudioLevelObserver()
+        } catch {
+            throw error
+        }
+    }
+    
+    public func startRemoteParticipantsAudioLevelObserver() async throws {
+        do {
+            try await call?.startRemoteParticipantsAudioLevelObserver()
         } catch {
             throw error
         }
