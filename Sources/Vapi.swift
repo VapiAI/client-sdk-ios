@@ -194,7 +194,7 @@ public final class Vapi: CallClientDelegate {
         }
     }
 
-    private func joinCall(with url: URL) {
+    private func joinCall(url: URL, recordVideo: Bool) {
         Task { @MainActor in
             do {
                 let call = CallClient()
@@ -205,8 +205,22 @@ public final class Vapi: CallClientDelegate {
                     url: url,
                     settings: .init(
                         inputs: .set(
-                            camera: .set(.enabled(false)),
+                            camera: .set(.enabled(recordVideo)),
                             microphone: .set(.enabled(true))
+                        )
+                    )
+                )
+                
+                if(!recordVideo) {
+                    return
+                }
+                    
+                _ = try await call.startRecording(
+                    streamingSettings: .init(
+                        video: .init(
+                            width:1280,
+                            height:720,
+                            backgroundColor: "#FF1F2D3D"
                         )
                     )
                 )
@@ -255,7 +269,8 @@ public final class Vapi: CallClientDelegate {
         
         do {
             let response: WebCallResponse = try await networkManager.perform(request: request)
-            joinCall(with: response.webCallUrl)
+            let isVideoRecordingEnabled = response.artifactPlan?.videoRecordingEnabled ?? false
+            joinCall(url: response.webCallUrl, recordVideo: isVideoRecordingEnabled)
             return response
         } catch {
             callDidFail(with: error)
