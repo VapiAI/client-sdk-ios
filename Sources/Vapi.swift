@@ -77,6 +77,10 @@ public final class Vapi: CallClientDelegate {
         call?.remoteParticipantsAudioLevel.values.first
     }
     
+    @MainActor public var audioDeviceType: AudioDeviceType? {
+        call?.audioDevice
+    }
+    
     // MARK: - Init
     
     public init(configuration: Configuration) {
@@ -193,6 +197,25 @@ public final class Vapi: CallClientDelegate {
             throw error
         }
     }
+    
+    /// This method sets the `AudioDeviceType` of the current called to the passed one if it's not the same as the current one
+    /// - Parameter audioDeviceType: can either be `bluetooth`, `speakerphone`, `wired` or `earpiece`
+    public func setAudioDeviceType(_ audioDeviceType: AudioDeviceType) async throws {
+        guard let call else {
+            throw VapiError.noCallInProgress
+        }
+        
+        guard await self.audioDeviceType != audioDeviceType else {
+            print("Not updating AudioDeviceType because it is the same")
+            return
+        }
+        
+        do {
+            try await call.setPreferredAudioDevice(audioDeviceType)
+        } catch {
+            print("Failed to change the AudioDeviceType with error: \(error)")
+        }
+    }
 
     private func joinCall(url: URL, recordVideo: Bool) {
         Task { @MainActor in
@@ -278,7 +301,7 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
-    private func unescapeAppMessage(_ jsonData: Data) -> (Data, String?) {  
+    private func unescapeAppMessage(_ jsonData: Data) -> (Data, String?) {
         guard let jsonString = String(data: jsonData, encoding: .utf8) else {
             return (jsonData, nil)
         }
