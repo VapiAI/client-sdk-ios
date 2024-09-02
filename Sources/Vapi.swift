@@ -81,6 +81,9 @@ public final class Vapi: CallClientDelegate {
         call?.audioDevice
     }
     
+    private var isMicrophoneMuted: Bool = false
+    private var isAssistantMuted: Bool = false
+    
     // MARK: - Init
     
     public init(configuration: Configuration) {
@@ -155,8 +158,6 @@ public final class Vapi: CallClientDelegate {
           throw error // Re-throw the error to be handled by the caller
       }
     }
-    
-    private var isMicrophoneMuted: Bool = false
 
     public func setMuted(_ muted: Bool) async throws {
         guard let call = self.call else {
@@ -198,6 +199,37 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
+    public func setAssistantMuted(_ muted: Bool) async throws {
+        guard let call = self.call else {
+            throw VapiError.noCallInProgress
+        }
+        
+        do {
+            // First retrieve the assistant, which will always be the first remote participant
+            guard let assistant = await call.participants.remote.first?.value else { return }
+            
+            // Then we update the subscription to `staged` if muted which means we don't receive audio
+            // but we'll still receive the response. If we unmute it we set it back to `subscribed` so we start
+            // receiving audio again. This is taken from Daily examples.
+            try await call.updateSubscriptions(
+                forParticipants: .set([
+                    assistant.id: .set(
+                        profile: .set(.base),
+                        media: .set(
+                            microphone: .set(
+                                subscriptionState: muted ? .set(.staged) : .set(.subscribed)
+                            )
+                        )
+                    )
+                ])
+            )
+            isAssistantMuted = muted
+        } catch {
+            print("Failed to set subscription state to \(muted ? "Staged" : "Subscribed") so changing the audio for the assistant")
+            throw error
+        }
+    }
+    
     /// This method sets the `AudioDeviceType` of the current called to the passed one if it's not the same as the current one
     /// - Parameter audioDeviceType: can either be `bluetooth`, `speakerphone`, `wired` or `earpiece`
     public func setAudioDeviceType(_ audioDeviceType: AudioDeviceType) async throws {
@@ -214,6 +246,7 @@ public final class Vapi: CallClientDelegate {
             try await call.setPreferredAudioDevice(audioDeviceType)
         } catch {
             print("Failed to change the AudioDeviceType with error: \(error)")
+            throw error
         }
     }
 
