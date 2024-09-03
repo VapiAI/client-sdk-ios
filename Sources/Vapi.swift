@@ -134,6 +134,7 @@ public final class Vapi: CallClientDelegate {
         Task {
             do {
                 try await call?.leave()
+                call = nil
             } catch {
                 self.callDidFail(with: error)
             }
@@ -200,18 +201,20 @@ public final class Vapi: CallClientDelegate {
     }
     
     public func setAssistantMuted(_ muted: Bool) async throws {
-        guard let call = self.call else {
+        guard let call else {
             throw VapiError.noCallInProgress
         }
         
         do {
-            // First retrieve the assistant, which will always be the first remote participant
-            guard let assistant = await call.participants.remote.first?.value else { return }
+            let remoteParticipants = await call.participants.remote
+            
+            // First retrieve the assistant where the user name is "Vapi Speaker", this is the one we will unsubscribe from or subscribe too
+            guard let assistant = remoteParticipants.first(where: { $0.value.info.username == .remoteParticipantVapiSpeaker })?.value else { return }
             
             // Then we update the subscription to `staged` if muted which means we don't receive audio
             // but we'll still receive the response. If we unmute it we set it back to `subscribed` so we start
             // receiving audio again. This is taken from Daily examples.
-            try await call.updateSubscriptions(
+            _ = try await call.updateSubscriptions(
                 forParticipants: .set([
                     assistant.id: .set(
                         profile: .set(.base),
@@ -225,7 +228,7 @@ public final class Vapi: CallClientDelegate {
             )
             isAssistantMuted = muted
         } catch {
-            print("Failed to set subscription state to \(muted ? "Staged" : "Subscribed") so changing the audio for the assistant")
+            print("Failed to set subscription state to \(muted ? "Staged" : "Subscribed") for remote assistant")
             throw error
         }
     }
