@@ -19,7 +19,7 @@ Pick the desired dependency rule (under “Dependency Rule”), as well as build
 To depend on the Vapi package, you can declare your dependency in your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/VapiAI/ios"),
+.package(url: "https://github.com/VapiAI/ios", branch: "main"),
 ```
 
 and add `"Vapi"` to your application/library target, `dependencies`, e.g. like this:
