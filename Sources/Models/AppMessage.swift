@@ -15,6 +15,8 @@ struct AppMessage: Codable {
         case speechUpdate = "speech-update"
         case metadata
         case conversationUpdate = "conversation-update"
+        case modelOutput = "model-output"
+        case statusUpdate = "status-update"
     }
     
     let type: MessageType
