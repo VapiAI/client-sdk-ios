@@ -47,6 +47,8 @@ public final class Vapi: CallClientDelegate {
         case conversationUpdate(ConversationUpdate)
         case statusUpdate(StatusUpdate)
         case modelOutput(ModelOutput)
+        case userInterrupted(UserInterrupted)
+        case voiceInput(VoiceInput)
         case hang
         case error(Swift.Error)
     }
@@ -483,6 +485,12 @@ public final class Vapi: CallClientDelegate {
             case .modelOutput:
                 let modelOutput = try decoder.decode(ModelOutput.self, from: unescapedData)
                 event = Event.modelOutput(modelOutput)
+            case .userInterrupted:
+                let userInterrupted = UserInterrupted()
+                event = Event.userInterrupted(userInterrupted)
+            case .voiceInput:
+                let voiceInput = try decoder.decode(VoiceInput.self, from: unescapedData)
+                event = Event.voiceInput(voiceInput)
             }
             eventSubject.send(event)
         } catch {
