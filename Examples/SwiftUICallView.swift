@@ -39,6 +39,14 @@ class CallManager: ObservableObject {
                     print(event)
                 case .transcript:
                     print(event)
+                case .statusUpdate:
+                    print(event)
+                case .modelOutput:
+                    print(event)
+                case .userInterrupted:
+                    print(event)
+                case .voiceInput:
+                    print(event)
                 case .error(let error):
                     print("Error: \(error)")
                 }
