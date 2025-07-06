@@ -35,6 +35,7 @@ and add `"Vapi"` to your application/library target, `dependencies`, e.g. like t
 You will need to update your project's Info.plist to add three new entries with the following keys:
 
 - NSMicrophoneUsageDescription
+- NSCameraUsageDescription (optional)
 - UIBackgroundModes
 
 For the first two key's values, provide user-facing strings explaining why your app is asking for microphone access.
