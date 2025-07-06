@@ -43,12 +43,12 @@ UIBackgroundModes is handled slightly differently and will resolve to an array. 
 
 To add the new entries through Xcode, open the Info.plist and add the following four entries (Camera is optional):
 
-| Key                                  | Type   | Value                                        |
-|--------------------------------------|--------|----------------------------------------------|
-| Privacy - Camera Usage Description|    String    "Your app name needs camera access to work
-| Privacy - Microphone Usage Description| String | "Your app name needs microphone access to work" |
-| Required background modes            | Array  | 1 item                                       |
-| ---> Item 0                          | String | "App provides Voice over IP services"        |
+| Key                                    | Type   | Value                                           |
+|----------------------------------------|--------|-------------------------------------------------|
+| Privacy - Camera Usage Description     | String | "Your app name needs camera access to work"     |
+| Privacy - Microphone Usage Description | String | "Your app name needs microphone access to work" |
+| Required background modes              | Array  | 1 item                                          |
+| ---> Item 0                            | String | "App provides Voice over IP services"           |
 
 If you view the raw file contents of Info.plist, it should look like this:
 
