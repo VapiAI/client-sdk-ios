@@ -35,14 +35,14 @@ and add `"Vapi"` to your application/library target, `dependencies`, e.g. like t
 You will need to update your project's Info.plist to add three new entries with the following keys:
 
 - NSMicrophoneUsageDescription
-- NSCameraUsageDescription (optional)
+- NSCameraUsageDescription
 - UIBackgroundModes
 
-For the first two key's values, provide user-facing strings explaining why your app is asking for microphone access.
+For the first two key's values, provide user-facing strings explaining why your app is asking for microphone and camera access.
 
 UIBackgroundModes is handled slightly differently and will resolve to an array. For its first item, specify the value voip. This ensures that audio will continue uninterrupted when your app is sent to the background.
 
-To add the new entries through Xcode, open the Info.plist and add the following four entries (Camera is optional):
+To add the new entries through Xcode, open the Info.plist and add the following four entries:
 
 | Key                                    | Type   | Value                                           |
 |----------------------------------------|--------|-------------------------------------------------|
