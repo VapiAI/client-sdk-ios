@@ -14,14 +14,14 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/daily-co/daily-client-ios", from: "0.2.0"),
+        .package(url: "https://github.com/daily-co/daily-client-ios", from: "0.31.0"),
     ],
     targets: [
         .target(
             name: "Vapi",
             dependencies: [
                 .product(name: "Daily", package: "daily-client-ios")
-            ], 
+            ],
             path: "Sources"
         ),
         .testTarget(
