@@ -467,31 +467,8 @@ public final class Vapi: CallClientDelegate {
                 let functionCall = FunctionCall(name: name, parameters: parameters)
                 event = Event.functionCall(functionCall)
             case .toolCalls:
-                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
-                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
-                }
-                guard let toolsCallsArray = messageDictionary["toolCalls"] as? [[String: Any]] else {
-                    throw VapiError.decodingError(message: "App message missing toolCalls")
-                }
-                let toolCalls: [ToolCall] = try toolsCallsArray.map { dict in
-                    guard let id = dict[ToolCall.CodingKeys.id.stringValue] as? String else {
-                        throw VapiError.decodingError(message: "ToolCall missing id")
-                    }
-                    guard let type = dict[ToolCall.CodingKeys.type.stringValue] as? String else {
-                        throw VapiError.decodingError(message: "ToolCall missing type")
-                    }
-                    guard let functionDict = dict[ToolCall.CodingKeys.function.stringValue] as? [String: Any] else {
-                        throw VapiError.decodingError(message: "ToolCall missing function")
-                    }
-                    guard let name = functionDict[ToolCall.Function.CodingKeys.name.stringValue] as? String else {
-                        throw VapiError.decodingError(message: "ToolCall missing function name")
-                    }
-                    guard let arguments = functionDict[ToolCall.Function.CodingKeys.arguments.stringValue] as? String else {
-                        throw VapiError.decodingError(message: "ToolCall missing function arguments")
-                    }
-                    return .init(id: id, type: type, function: .init(name: name, arguments: arguments))
-                }
-                event = Event.toolCalls(toolCalls)
+                let toolCalls = try decoder.decode(ToolCalls.self, from: unescapedData)
+                event = Event.toolCalls(toolCalls.toolCalls)
             case .hang:
                 event = Event.hang
             case .transcript:

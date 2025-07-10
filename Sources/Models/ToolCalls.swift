@@ -1,11 +1,15 @@
 //
-//  ToolCall.swift
+//  ToolCalls.swift
 //
 //
 //  Created by Anton Begehr on 2025-07-10.
 //
 
 import Foundation
+
+public struct ToolCalls: Codable {
+    public let toolCalls: [ToolCall]
+}
 
 public struct ToolCall: Codable {
     enum CodingKeys: CodingKey {
