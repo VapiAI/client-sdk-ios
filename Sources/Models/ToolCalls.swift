@@ -31,6 +31,6 @@ public extension ToolCall {
         }
 
         public let name: String
-        public let arguments: AnyCodable // In `conversation-update.messages`, this will be an encoded string. In `tool-calls.toolCalls`, this will be a dictionary.
+        public let arguments: AnyCodable // In `conversation-update`, this will be an encoded string. In `tool-calls`, this will be a dictionary.
     }
 }
