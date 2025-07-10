@@ -27,6 +27,6 @@ public extension ToolCall {
         }
 
         public let name: String
-        public let arguments: String // TODO: actually is [String: Any]
+        public let arguments: [String: AnyCodable]
     }
 }
