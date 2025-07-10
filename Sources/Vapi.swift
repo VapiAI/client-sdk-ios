@@ -477,10 +477,10 @@ public final class Vapi: CallClientDelegate {
                     guard let id = dict[ToolCall.CodingKeys.id.stringValue] as? String else {
                         throw VapiError.decodingError(message: "ToolCall missing id")
                     }
-                    guard let type = dict[ToolCall.CodingKeys.id.stringValue] as? String else {
+                    guard let type = dict[ToolCall.CodingKeys.type.stringValue] as? String else {
                         throw VapiError.decodingError(message: "ToolCall missing type")
                     }
-                    guard let functionDict = dict[ToolCall.CodingKeys.id.stringValue] as? [String: Any] else {
+                    guard let functionDict = dict[ToolCall.CodingKeys.function.stringValue] as? [String: Any] else {
                         throw VapiError.decodingError(message: "ToolCall missing function")
                     }
                     guard let name = functionDict[ToolCall.Function.CodingKeys.name.stringValue] as? String else {

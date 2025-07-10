@@ -28,7 +28,7 @@ extension VapiError {
         case .noCallInProgress:
             return "No call in progress"
         case .decodingError(let message, let response):
-            return "\(message)\n\(response ?? "No response data")"
+            return "\(message), \(response ?? "no response")"
         case .invalidJsonData:
             return "Invalid JSON data"
         }
