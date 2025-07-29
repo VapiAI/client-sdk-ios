@@ -61,7 +61,9 @@ public final class Vapi: CallClientDelegate {
     
     private let networkManager = NetworkManager()
     private var call: CallClient?
-    
+
+    private var lastMessageTimestamp: Double = 0
+
     // MARK: - Computed Properties
     
     private var publicKey: String {
@@ -479,6 +481,33 @@ public final class Vapi: CallClientDelegate {
             case .conversationUpdate:
                 let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
                 event = Event.conversationUpdate(conv)
+                
+                if let messages = conv.messages, !messages.isEmpty {
+                    let newMessages = messages.filter { $0.time > self.lastMessageTimestamp }
+                    
+                    if !newMessages.isEmpty {
+                        if let latestTime = newMessages.map({ $0.time }).max() {
+                            self.lastMessageTimestamp = latestTime
+                        }
+                        
+                        for message in newMessages {
+                            if message.role == .toolCalls, let toolCalls = message.toolCalls, !toolCalls.isEmpty {
+                                for toolCall in toolCalls {
+                                    if let functionName = toolCall.function?.name,
+                                       let functionArgs = toolCall.function?.arguments {
+                                        
+                                        if let argsData = functionArgs.data(using: .utf8),
+                                           let parameters = try? JSONSerialization.jsonObject(with: argsData, options: []) as? [String: Any] {
+                                            
+                                            let functionCall = FunctionCall(name: functionName, parameters: parameters)
+                                            eventSubject.send(Event.functionCall(functionCall))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             case .statusUpdate:
                 let statusUpdate = try decoder.decode(StatusUpdate.self, from: unescapedData)
                 event = Event.statusUpdate(statusUpdate)
@@ -495,7 +524,7 @@ public final class Vapi: CallClientDelegate {
             eventSubject.send(event)
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)
-            print("Error parsing app message \"\(messageText ?? "")\": \(error.localizedDescription)")
+            print("Error parsing app message \"\(messageText ?? "")\": \(String(describing: error))")
         }
     }
 }
