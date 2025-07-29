@@ -42,6 +42,7 @@ public final class Vapi: CallClientDelegate {
         case callDidEnd
         case transcript(Transcript)
         case functionCall(FunctionCall)
+        case toolCalls([ToolCall])
         case speechUpdate(SpeechUpdate)
         case metadata(Metadata)
         case conversationUpdate(ConversationUpdate)
@@ -465,6 +466,9 @@ public final class Vapi: CallClientDelegate {
                 
                 let functionCall = FunctionCall(name: name, parameters: parameters)
                 event = Event.functionCall(functionCall)
+            case .toolCalls:
+                let toolCalls = try decoder.decode(ToolCalls.self, from: unescapedData)
+                event = Event.toolCalls(toolCalls.toolCalls)
             case .hang:
                 event = Event.hang
             case .transcript:

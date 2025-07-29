@@ -11,6 +11,7 @@ struct AppMessage: Codable {
     enum MessageType: String, Codable {
         case hang
         case functionCall = "function-call"
+        case toolCalls = "tool-calls"
         case transcript
         case speechUpdate = "speech-update"
         case metadata
