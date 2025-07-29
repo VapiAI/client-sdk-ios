@@ -66,17 +66,20 @@ class CallManager: ObservableObject {
     @MainActor
     func startCall() async {
         callState = .loading
-        let assistant = [
+        let assistant: [String: Any] = [
             "model": [
                 "provider": "openai",
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-4",
                 "messages": [
-                    ["role":"system", "content":"You are an assistant."]
-                ],
+                    ["role": "system", "content": "You are an assistant."]
+                ]
             ],
-            "firstMessage": "Hey there",
-            "voice": "jennifer-playht"
-        ] as [String : Any]
+            "firstMessage": "Hey there!",
+            "voice": [
+                "provider": "11labs",
+                "voiceId": "pNInz6obpgDQGcFmaJgB"
+            ]
+        ]
         do {
             try await vapi.start(assistant: assistant)
         } catch {
