@@ -47,16 +47,19 @@ public final class Vapi: CallClientDelegate {
         case conversationUpdate(ConversationUpdate)
         case hang
         case error(Swift.Error)
+        case participantJoined(Participant)
+        case participantLeft(Participant)
+        case userInterrupted
     }
     
     // MARK: - Properties
 
-    public let configuration: Configuration
+    public private(set) var configuration: Configuration
 
     fileprivate let eventSubject = PassthroughSubject<Event, Never>()
     
     private let networkManager = NetworkManager()
-    private var call: CallClient?
+    public private(set) var call: CallClient?
     
     // MARK: - Computed Properties
     
@@ -83,26 +86,43 @@ public final class Vapi: CallClientDelegate {
     
     // MARK: - Init
     
-    public init(configuration: Configuration) {
+    public init(configuration: Configuration, logLevel: LogLevel) {
         self.configuration = configuration
         
-        Daily.setLogLevel(.off)
+        Task { @MainActor in
+            do {
+                call = CallClient()
+                call?.delegate = self
+                call?.setInputsEnabled([
+                    .camera: true,
+                    .microphone: true
+                ], completion: nil)
+            }
+        }
+        
+        Daily.setLogLevel(logLevel)
     }
     
-    public convenience init(publicKey: String) {
-        self.init(configuration: .init(publicKey: publicKey, host: Configuration.defaultHost))
+    public convenience init(publicKey: String, logLevel: LogLevel = .off) {
+        self.init(configuration: .init(publicKey: publicKey, host: Configuration.defaultHost), logLevel: logLevel)
     }
     
-    public convenience init(publicKey: String, host: String? = nil) {
-        self.init(configuration: .init(publicKey: publicKey, host: host ?? Configuration.defaultHost))
+    public convenience init(publicKey: String, host: String? = nil, logLevel: LogLevel = .off) {
+        self.init(configuration: .init(publicKey: publicKey, host: host ?? Configuration.defaultHost), logLevel: logLevel)
     }
     
     // MARK: - Instance Methods
     
     public func start(
-        assistantId: String, metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
+        assistantId: String, publicKey: String? = nil, metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
     ) async throws -> WebCallResponse {
-        guard self.call == nil else {
+        if let publicKey {
+            configuration.publicKey = publicKey
+        }
+        guard call != nil else {
+            throw VapiError.customError("call not initialized")
+        }
+        guard await self.call?.callState != .joined else {
             throw VapiError.existingCallInProgress
         }
         
@@ -114,9 +134,15 @@ public final class Vapi: CallClientDelegate {
     }
     
     public func start(
-        assistant: [String: Any], metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
+        assistant: [String: Any], publicKey: String? = nil, metadata: [String: Any] = [:], assistantOverrides: [String: Any] = [:]
     ) async throws -> WebCallResponse {
-        guard self.call == nil else {
+        if let publicKey {
+            configuration.publicKey = publicKey
+        }
+        guard call != nil else {
+            throw VapiError.customError("call not initialized")
+        }
+        guard await self.call?.callState != .joined else {
             throw VapiError.existingCallInProgress
         }
         
@@ -127,12 +153,15 @@ public final class Vapi: CallClientDelegate {
         return try await self.startCall(body: body)
     }
     
-    public func stop() {
+    public func stop(completion: @escaping () -> Void) {
         Task {
             do {
                 try await call?.leave()
+                call = nil
+                completion()
             } catch {
                 self.callDidFail(with: error)
+                completion()
             }
         }
     }
@@ -159,7 +188,8 @@ public final class Vapi: CallClientDelegate {
     private var isMicrophoneMuted: Bool = false
 
     public func setMuted(_ muted: Bool) async throws {
-        guard let call = self.call else {
+        guard let call else { return }
+        guard await call.callState == .joined else {
             throw VapiError.noCallInProgress
         }
         
@@ -178,7 +208,8 @@ public final class Vapi: CallClientDelegate {
     }
 
     public func isMuted() async throws {
-        guard let call = self.call else {
+        guard let call else { return }
+        guard await call.callState == .joined else {
             throw VapiError.noCallInProgress
         }
         
@@ -201,7 +232,8 @@ public final class Vapi: CallClientDelegate {
     /// This method sets the `AudioDeviceType` of the current called to the passed one if it's not the same as the current one
     /// - Parameter audioDeviceType: can either be `bluetooth`, `speakerphone`, `wired` or `earpiece`
     public func setAudioDeviceType(_ audioDeviceType: AudioDeviceType) async throws {
-        guard let call else {
+        guard let call else { return }
+        guard await call.callState == .joined else {
             throw VapiError.noCallInProgress
         }
         
@@ -220,9 +252,10 @@ public final class Vapi: CallClientDelegate {
     private func joinCall(url: URL, recordVideo: Bool) {
         Task { @MainActor in
             do {
-                let call = CallClient()
-                call.delegate = self
-                self.call = call
+                guard let call else { return }
+                guard call.callState != .joined || call.callState != .joining else {
+                    throw VapiError.existingCallInProgress
+                }
                 
                 _ = try await call.join(
                     url: url,
@@ -355,6 +388,14 @@ public final class Vapi: CallClientDelegate {
         self.call = nil
     }
     
+    public func callClient(_ callClient: CallClient, participantJoined participant: Participant) {
+        eventSubject.send(.participantJoined(participant))
+    }
+    
+    public func callClient(_ callClient: CallClient, participantLeft participant: Participant, withReason reason: ParticipantLeftReason) {
+        eventSubject.send(.participantLeft(participant))
+    }
+    
     public func callClient(_ callClient: CallClient, participantUpdated participant: Participant) {
         let isPlayable = participant.media?.microphone.state == Daily.MediaState.playable
         let isVapiSpeaker = participant.info.username == "Vapi Speaker"
@@ -439,6 +480,8 @@ public final class Vapi: CallClientDelegate {
             case .conversationUpdate:
                 let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
                 event = Event.conversationUpdate(conv)
+            case .userInterruped:
+                event = Event.userInterrupted
             }
             eventSubject.send(event)
         } catch {
