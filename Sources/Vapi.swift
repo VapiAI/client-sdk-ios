@@ -51,6 +51,19 @@ public final class Vapi: CallClientDelegate {
         case voiceInput(VoiceInput)
         case hang
         case error(Swift.Error)
+        case assistantStarted([String: Any])
+        case workflowNodeStarted(WorkflowNodeStarted)
+        case toolCalls(ToolCallList)
+        case toolCallsResult(ToolCallResult)
+        case transferUpdate(TransferUpdate)
+        case languageChangeDetected(LanguageChangeDetected)
+        case chatCreated([String: Any])
+        case chatDeleted([String: Any])
+        case sessionCreated([String: Any])
+        case sessionUpdated([String: Any])
+        case sessionDeleted([String: Any])
+        case callDeleted
+        case callDeleteFailed
     }
     
     // MARK: - Properties
@@ -439,10 +452,9 @@ public final class Vapi: CallClientDelegate {
                 return
             }
             
-            // Parse the JSON data generically to determine the type of event
             let decoder = JSONDecoder()
             let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
-            // Parse the JSON data again, this time using the specific type
+
             let event: Event
             switch appMessage.type {
             case .functionCall:
@@ -461,7 +473,6 @@ public final class Vapi: CallClientDelegate {
                 guard let parameters = functionCallDictionary[FunctionCall.CodingKeys.parameters.stringValue] as? [String: Any] else {
                     throw VapiError.decodingError(message: "App message missing parameters")
                 }
-                
                 
                 let functionCall = FunctionCall(name: name, parameters: parameters)
                 event = Event.functionCall(functionCall)
@@ -491,6 +502,52 @@ public final class Vapi: CallClientDelegate {
             case .voiceInput:
                 let voiceInput = try decoder.decode(VoiceInput.self, from: unescapedData)
                 event = Event.voiceInput(voiceInput)
+            case .assistantStarted:
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+                }
+                event = Event.assistantStarted(messageDictionary)
+            case .workflowNodeStarted:
+                let workflowNode = try decoder.decode(WorkflowNodeStarted.self, from: unescapedData)
+                event = Event.workflowNodeStarted(workflowNode)
+            case .toolCalls:
+                let toolCallList = try decoder.decode(ToolCallList.self, from: unescapedData)
+                event = Event.toolCalls(toolCallList)
+            case .toolCallsResult:
+                let toolCallResult = try decoder.decode(ToolCallResult.self, from: unescapedData)
+                event = Event.toolCallsResult(toolCallResult)
+            case .transferUpdate:
+                let transferUpdate = try decoder.decode(TransferUpdate.self, from: unescapedData)
+                event = Event.transferUpdate(transferUpdate)
+            case .languageChangeDetected:
+                let langChange = try decoder.decode(LanguageChangeDetected.self, from: unescapedData)
+                event = Event.languageChangeDetected(langChange)
+            case .chatCreated, .chatDeleted:
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+                }
+                event = appMessage.type == .chatCreated
+                    ? Event.chatCreated(messageDictionary)
+                    : Event.chatDeleted(messageDictionary)
+            case .sessionCreated, .sessionUpdated, .sessionDeleted:
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+                }
+                switch appMessage.type {
+                case .sessionCreated:
+                    event = Event.sessionCreated(messageDictionary)
+                case .sessionUpdated:
+                    event = Event.sessionUpdated(messageDictionary)
+                default:
+                    event = Event.sessionDeleted(messageDictionary)
+                }
+            case .callDeleted:
+                event = Event.callDeleted
+            case .callDeleteFailed:
+                event = Event.callDeleteFailed
+            case .unknown(let rawType):
+                print("Received unhandled message type: \(rawType)")
+                return
             }
             eventSubject.send(event)
         } catch {
