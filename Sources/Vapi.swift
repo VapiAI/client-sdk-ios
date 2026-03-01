@@ -49,6 +49,20 @@ public final class Vapi: CallClientDelegate {
         case modelOutput(ModelOutput)
         case userInterrupted(UserInterrupted)
         case voiceInput(VoiceInput)
+        case workflowNodeStarted([String: Any])
+        case assistantStarted([String: Any])
+        case toolCalls([String: Any])
+        case toolCallsResult([String: Any])
+        case transferUpdate([String: Any])
+        case languageChangeDetected([String: Any])
+        case chatCreated([String: Any])
+        case chatDeleted([String: Any])
+        case sessionCreated([String: Any])
+        case sessionUpdated([String: Any])
+        case sessionDeleted([String: Any])
+        case callDeleted([String: Any])
+        case callDeleteFailed([String: Any])
+        case unknown(type: String, payload: [String: Any])
         case hang
         case error(Swift.Error)
     }
@@ -341,21 +355,171 @@ public final class Vapi: CallClientDelegate {
         }
     }
     
-    private func unescapeAppMessage(_ jsonData: Data) -> (Data, String?) {
-        guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-            return (jsonData, nil)
+    private enum NormalizedAppMessage {
+        case listening
+        case json(Data)
+    }
+    
+    private func normalizeAppMessage(_ jsonData: Data) -> NormalizedAppMessage {
+        var currentData = jsonData
+        
+        for _ in 0..<5 {
+            if let rawString = String(data: currentData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               rawString == "listening"
+            {
+                return .listening
+            }
+            
+            guard let jsonObject = try? JSONSerialization.jsonObject(with: currentData, options: []) else {
+                break
+            }
+            
+            if let encodedString = jsonObject as? String {
+                let trimmed = encodedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed == "listening" {
+                    return .listening
+                }
+                
+                currentData = Data(trimmed.utf8)
+                continue
+            }
+            
+            guard let dictionary = jsonObject as? [String: Any] else {
+                break
+            }
+            
+            if let nestedMessage = dictionary["message"] {
+                if let nestedMessageString = nestedMessage as? String {
+                    let trimmed = nestedMessageString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed == "listening" {
+                        return .listening
+                    }
+                    
+                    currentData = Data(trimmed.utf8)
+                    continue
+                }
+                
+                if JSONSerialization.isValidJSONObject(nestedMessage),
+                   let nestedData = try? JSONSerialization.data(withJSONObject: nestedMessage, options: [])
+                {
+                    currentData = nestedData
+                    continue
+                }
+            }
+            
+            return .json(currentData)
         }
-
-        // Remove the leading and trailing double quotes
-        let trimmedString = jsonString.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-        // Replace escaped backslashes
-        let unescapedString = trimmedString.replacingOccurrences(of: "\\\\", with: "\\")
-        // Replace escaped double quotes
-        let unescapedJSON = unescapedString.replacingOccurrences(of: "\\\"", with: "\"")
-
-        let unescapedData = unescapedJSON.data(using: .utf8) ?? jsonData
-
-        return (unescapedData, unescapedJSON)
+        
+        // Compatibility fallback for escaped JSON strings.
+        if let jsonString = String(data: currentData, encoding: .utf8) {
+            let trimmedString = jsonString
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            
+            if trimmedString == "listening" {
+                return .listening
+            }
+            
+            let unescapedString = trimmedString
+                .replacingOccurrences(of: "\\\\", with: "\\")
+                .replacingOccurrences(of: "\\\"", with: "\"")
+            
+            if let unescapedData = unescapedString.data(using: .utf8),
+               (try? JSONSerialization.jsonObject(with: unescapedData, options: [])) != nil
+            {
+                return .json(unescapedData)
+            }
+        }
+        
+        return .json(currentData)
+    }
+    
+    func decodeAppEvent(from jsonData: Data) throws -> Event? {
+        let normalizedMessage = normalizeAppMessage(jsonData)
+        
+        switch normalizedMessage {
+        case .listening:
+            return .callDidStart
+        case .json(let normalizedData):
+            let decoder = JSONDecoder()
+            let appMessage = try decoder.decode(AppMessage.self, from: normalizedData)
+            
+            guard let messageDictionary = try JSONSerialization.jsonObject(with: normalizedData, options: []) as? [String: Any] else {
+                throw VapiError.decodingError(message: "App message isn't a valid JSON object")
+            }
+            
+            switch appMessage.messageType {
+            case .functionCall:
+                guard let functionCallDictionary = messageDictionary["functionCall"] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing functionCall")
+                }
+                
+                guard let name = functionCallDictionary[FunctionCall.CodingKeys.name.stringValue] as? String else {
+                    throw VapiError.decodingError(message: "App message missing name")
+                }
+                
+                guard let parameters = functionCallDictionary[FunctionCall.CodingKeys.parameters.stringValue] as? [String: Any] else {
+                    throw VapiError.decodingError(message: "App message missing parameters")
+                }
+                
+                let functionCall = FunctionCall(name: name, parameters: parameters)
+                return .functionCall(functionCall)
+            case .hang:
+                return .hang
+            case .transcript:
+                let transcript = try decoder.decode(Transcript.self, from: normalizedData)
+                return .transcript(transcript)
+            case .speechUpdate:
+                let speechUpdate = try decoder.decode(SpeechUpdate.self, from: normalizedData)
+                return .speechUpdate(speechUpdate)
+            case .metadata:
+                let metadata = try decoder.decode(Metadata.self, from: normalizedData)
+                return .metadata(metadata)
+            case .conversationUpdate:
+                let conversationUpdate = try decoder.decode(ConversationUpdate.self, from: normalizedData)
+                return .conversationUpdate(conversationUpdate)
+            case .statusUpdate:
+                let statusUpdate = try decoder.decode(StatusUpdate.self, from: normalizedData)
+                return .statusUpdate(statusUpdate)
+            case .modelOutput:
+                let modelOutput = try decoder.decode(ModelOutput.self, from: normalizedData)
+                return .modelOutput(modelOutput)
+            case .userInterrupted:
+                return .userInterrupted(UserInterrupted())
+            case .voiceInput:
+                let voiceInput = try decoder.decode(VoiceInput.self, from: normalizedData)
+                return .voiceInput(voiceInput)
+            case .workflowNodeStarted:
+                return .workflowNodeStarted(messageDictionary)
+            case .assistantStarted:
+                return .assistantStarted(messageDictionary)
+            case .toolCalls:
+                return .toolCalls(messageDictionary)
+            case .toolCallsResult:
+                return .toolCallsResult(messageDictionary)
+            case .transferUpdate:
+                return .transferUpdate(messageDictionary)
+            case .languageChangeDetected:
+                return .languageChangeDetected(messageDictionary)
+            case .chatCreated:
+                return .chatCreated(messageDictionary)
+            case .chatDeleted:
+                return .chatDeleted(messageDictionary)
+            case .sessionCreated:
+                return .sessionCreated(messageDictionary)
+            case .sessionUpdated:
+                return .sessionUpdated(messageDictionary)
+            case .sessionDeleted:
+                return .sessionDeleted(messageDictionary)
+            case .callDeleted:
+                return .callDeleted(messageDictionary)
+            case .callDeleteFailed:
+                return .callDeleteFailed(messageDictionary)
+            case .unknown:
+                return .unknown(type: appMessage.type, payload: messageDictionary)
+            }
+        }
     }
     
     public func startLocalAudioLevelObserver() async throws {
@@ -431,67 +595,10 @@ public final class Vapi: CallClientDelegate {
     
     public func callClient(_ callClient: Daily.CallClient, appMessageAsJson jsonData: Data, from participantID: Daily.ParticipantID) {
         do {
-            let (unescapedData, unescapedString) = unescapeAppMessage(jsonData)
-            
-            // Detect listening message first since it's a string rather than JSON
-            guard unescapedString != "listening" else {
-                eventSubject.send(.callDidStart)
+            guard let event = try decodeAppEvent(from: jsonData) else {
                 return
             }
             
-            // Parse the JSON data generically to determine the type of event
-            let decoder = JSONDecoder()
-            let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
-            // Parse the JSON data again, this time using the specific type
-            let event: Event
-            switch appMessage.type {
-            case .functionCall:
-                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
-                    throw VapiError.decodingError(message: "App message isn't a valid JSON object")
-                }
-                
-                guard let functionCallDictionary = messageDictionary["functionCall"] as? [String: Any] else {
-                    throw VapiError.decodingError(message: "App message missing functionCall")
-                }
-                
-                guard let name = functionCallDictionary[FunctionCall.CodingKeys.name.stringValue] as? String else {
-                    throw VapiError.decodingError(message: "App message missing name")
-                }
-                
-                guard let parameters = functionCallDictionary[FunctionCall.CodingKeys.parameters.stringValue] as? [String: Any] else {
-                    throw VapiError.decodingError(message: "App message missing parameters")
-                }
-                
-                
-                let functionCall = FunctionCall(name: name, parameters: parameters)
-                event = Event.functionCall(functionCall)
-            case .hang:
-                event = Event.hang
-            case .transcript:
-                let transcript = try decoder.decode(Transcript.self, from: unescapedData)
-                event = Event.transcript(transcript)
-            case .speechUpdate:
-                let speechUpdate = try decoder.decode(SpeechUpdate.self, from: unescapedData)
-                event = Event.speechUpdate(speechUpdate)
-            case .metadata:
-                let metadata = try decoder.decode(Metadata.self, from: unescapedData)
-                event = Event.metadata(metadata)
-            case .conversationUpdate:
-                let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
-                event = Event.conversationUpdate(conv)
-            case .statusUpdate:
-                let statusUpdate = try decoder.decode(StatusUpdate.self, from: unescapedData)
-                event = Event.statusUpdate(statusUpdate)
-            case .modelOutput:
-                let modelOutput = try decoder.decode(ModelOutput.self, from: unescapedData)
-                event = Event.modelOutput(modelOutput)
-            case .userInterrupted:
-                let userInterrupted = UserInterrupted()
-                event = Event.userInterrupted(userInterrupted)
-            case .voiceInput:
-                let voiceInput = try decoder.decode(VoiceInput.self, from: unescapedData)
-                event = Event.voiceInput(voiceInput)
-            }
             eventSubject.send(event)
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)

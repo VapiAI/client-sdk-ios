@@ -47,6 +47,34 @@ class CallManager: ObservableObject {
                     print(event)
                 case .voiceInput:
                     print(event)
+                case .workflowNodeStarted:
+                    print(event)
+                case .assistantStarted:
+                    print(event)
+                case .toolCalls:
+                    print(event)
+                case .toolCallsResult:
+                    print(event)
+                case .transferUpdate:
+                    print(event)
+                case .languageChangeDetected:
+                    print(event)
+                case .chatCreated:
+                    print(event)
+                case .chatDeleted:
+                    print(event)
+                case .sessionCreated:
+                    print(event)
+                case .sessionUpdated:
+                    print(event)
+                case .sessionDeleted:
+                    print(event)
+                case .callDeleted:
+                    print(event)
+                case .callDeleteFailed:
+                    print(event)
+                case .unknown:
+                    print(event)
                 case .error(let error):
                     print("Error: \(error)")
                 }
