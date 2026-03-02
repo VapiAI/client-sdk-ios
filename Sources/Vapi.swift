@@ -49,6 +49,19 @@ public final class Vapi: CallClientDelegate {
         case modelOutput(ModelOutput)
         case userInterrupted(UserInterrupted)
         case voiceInput(VoiceInput)
+        case workflowNodeStarted(WorkflowNodeStarted)
+        case assistantStarted(AssistantStarted)
+        case toolCalls(ToolCalls)
+        case toolCallsResult(ToolCallsResult)
+        case transferUpdate(TransferUpdate)
+        case languageChangeDetected(LanguageChangeDetected)
+        case chatCreated(ChatCreated)
+        case chatDeleted(ChatDeleted)
+        case sessionCreated(SessionCreated)
+        case sessionUpdated(SessionUpdated)
+        case sessionDeleted(SessionDeleted)
+        case callDeleted(CallDeleted)
+        case callDeleteFailed(CallDeleteFailed)
         case hang
         case error(Swift.Error)
     }
@@ -358,6 +371,18 @@ public final class Vapi: CallClientDelegate {
         return (unescapedData, unescapedJSON)
     }
     
+    private func normalizedAppMessageData(_ jsonData: Data) -> Data {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
+            let messageObject = object["message"] as? [String: Any],
+            let messageData = try? JSONSerialization.data(withJSONObject: messageObject, options: [])
+        else {
+            return jsonData
+        }
+        
+        return messageData
+    }
+    
     public func startLocalAudioLevelObserver() async throws {
         do {
             try await call?.startLocalAudioLevelObserver()
@@ -441,12 +466,13 @@ public final class Vapi: CallClientDelegate {
             
             // Parse the JSON data generically to determine the type of event
             let decoder = JSONDecoder()
-            let appMessage = try decoder.decode(AppMessage.self, from: unescapedData)
+            let appMessageData = normalizedAppMessageData(unescapedData)
+            let appMessage = try decoder.decode(AppMessage.self, from: appMessageData)
             // Parse the JSON data again, this time using the specific type
             let event: Event
             switch appMessage.type {
             case .functionCall:
-                guard let messageDictionary = try JSONSerialization.jsonObject(with: unescapedData, options: []) as? [String: Any] else {
+                guard let messageDictionary = try JSONSerialization.jsonObject(with: appMessageData, options: []) as? [String: Any] else {
                     throw VapiError.decodingError(message: "App message isn't a valid JSON object")
                 }
                 
@@ -467,30 +493,69 @@ public final class Vapi: CallClientDelegate {
                 event = Event.functionCall(functionCall)
             case .hang:
                 event = Event.hang
-            case .transcript:
-                let transcript = try decoder.decode(Transcript.self, from: unescapedData)
+            case .transcript, .transcriptFinal:
+                let transcript = try decoder.decode(Transcript.self, from: appMessageData)
                 event = Event.transcript(transcript)
             case .speechUpdate:
-                let speechUpdate = try decoder.decode(SpeechUpdate.self, from: unescapedData)
+                let speechUpdate = try decoder.decode(SpeechUpdate.self, from: appMessageData)
                 event = Event.speechUpdate(speechUpdate)
             case .metadata:
-                let metadata = try decoder.decode(Metadata.self, from: unescapedData)
+                let metadata = try decoder.decode(Metadata.self, from: appMessageData)
                 event = Event.metadata(metadata)
             case .conversationUpdate:
-                let conv = try decoder.decode(ConversationUpdate.self, from: unescapedData)
+                let conv = try decoder.decode(ConversationUpdate.self, from: appMessageData)
                 event = Event.conversationUpdate(conv)
             case .statusUpdate:
-                let statusUpdate = try decoder.decode(StatusUpdate.self, from: unescapedData)
+                let statusUpdate = try decoder.decode(StatusUpdate.self, from: appMessageData)
                 event = Event.statusUpdate(statusUpdate)
             case .modelOutput:
-                let modelOutput = try decoder.decode(ModelOutput.self, from: unescapedData)
+                let modelOutput = try decoder.decode(ModelOutput.self, from: appMessageData)
                 event = Event.modelOutput(modelOutput)
             case .userInterrupted:
                 let userInterrupted = UserInterrupted()
                 event = Event.userInterrupted(userInterrupted)
             case .voiceInput:
-                let voiceInput = try decoder.decode(VoiceInput.self, from: unescapedData)
+                let voiceInput = try decoder.decode(VoiceInput.self, from: appMessageData)
                 event = Event.voiceInput(voiceInput)
+            case .workflowNodeStarted:
+                let workflowNodeStarted = try decoder.decode(WorkflowNodeStarted.self, from: appMessageData)
+                event = Event.workflowNodeStarted(workflowNodeStarted)
+            case .assistantStarted:
+                let assistantStarted = try decoder.decode(AssistantStarted.self, from: appMessageData)
+                event = Event.assistantStarted(assistantStarted)
+            case .toolCalls:
+                let toolCalls = try decoder.decode(ToolCalls.self, from: appMessageData)
+                event = Event.toolCalls(toolCalls)
+            case .toolCallsResult:
+                let toolCallsResult = try decoder.decode(ToolCallsResult.self, from: appMessageData)
+                event = Event.toolCallsResult(toolCallsResult)
+            case .transferUpdate:
+                let transferUpdate = try decoder.decode(TransferUpdate.self, from: appMessageData)
+                event = Event.transferUpdate(transferUpdate)
+            case .languageChangeDetected:
+                let languageChangeDetected = try decoder.decode(LanguageChangeDetected.self, from: appMessageData)
+                event = Event.languageChangeDetected(languageChangeDetected)
+            case .chatCreated:
+                let chatCreated = try decoder.decode(ChatCreated.self, from: appMessageData)
+                event = Event.chatCreated(chatCreated)
+            case .chatDeleted:
+                let chatDeleted = try decoder.decode(ChatDeleted.self, from: appMessageData)
+                event = Event.chatDeleted(chatDeleted)
+            case .sessionCreated:
+                let sessionCreated = try decoder.decode(SessionCreated.self, from: appMessageData)
+                event = Event.sessionCreated(sessionCreated)
+            case .sessionUpdated:
+                let sessionUpdated = try decoder.decode(SessionUpdated.self, from: appMessageData)
+                event = Event.sessionUpdated(sessionUpdated)
+            case .sessionDeleted:
+                let sessionDeleted = try decoder.decode(SessionDeleted.self, from: appMessageData)
+                event = Event.sessionDeleted(sessionDeleted)
+            case .callDeleted:
+                let callDeleted = CallDeleted()
+                event = Event.callDeleted(callDeleted)
+            case .callDeleteFailed:
+                let callDeleteFailed = CallDeleteFailed()
+                event = Event.callDeleteFailed(callDeleteFailed)
             }
             eventSubject.send(event)
         } catch {
