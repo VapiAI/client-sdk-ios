@@ -27,28 +27,10 @@ class CallManager: ObservableObject {
                     self?.callState = .started
                 case .callDidEnd:
                     self?.callState = .ended
-                case .speechUpdate:
-                    print(event)
-                case .conversationUpdate:
-                    print(event)
-                case .functionCall:
-                    print(event)
-                case .hang:
-                    print(event)
-                case .metadata:
-                    print(event)
-                case .transcript:
-                    print(event)
-                case .statusUpdate:
-                    print(event)
-                case .modelOutput:
-                    print(event)
-                case .userInterrupted:
-                    print(event)
-                case .voiceInput:
-                    print(event)
                 case .error(let error):
                     print("Error: \(error)")
+                default:
+                    print(event)
                 }
             }
             .store(in: &cancellables)
