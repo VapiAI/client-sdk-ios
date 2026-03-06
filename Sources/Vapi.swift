@@ -153,28 +153,46 @@ public final class Vapi: CallClientDelegate {
                 try await call?.leave()
                 call = nil
             } catch {
-                self.callDidFail(with: error)
+                let wrappedError = VapiError.webRTCError(underlyingError: error, operation: "leave")
+                VapiLogger.log(
+                    level: .error,
+                    component: .webRTC,
+                    message: "Failed to leave call",
+                    context: ["error": String(describing: error)]
+                )
+                self.callDidFail(with: wrappedError)
             }
         }
     }
 
     public func send(message: VapiMessage) async throws {
+        let jsonData: Data
         do {
-          // Use JSONEncoder to convert the message to JSON Data
-          let jsonData = try JSONEncoder().encode(message)
-          
-          // Debugging: Print the JSON data to verify its format (optional)
-          if let jsonString = String(data: jsonData, encoding: .utf8) {
-              print(jsonString)
-          }
-          
-          // Send the JSON data to all targets
-          try await self.call?.sendAppMessage(json: jsonData, to: .all)
-      } catch {
-          // Handle encoding error
-          print("Error encoding message to JSON: \(error)")
-          throw error // Re-throw the error to be handled by the caller
-      }
+            jsonData = try JSONEncoder().encode(message)
+        } catch {
+            VapiLogger.log(
+                level: .error,
+                component: .appMessage,
+                message: "Failed to encode outgoing message",
+                context: [
+                    "messageType": message.type,
+                    "error": String(describing: error)
+                ]
+            )
+            throw VapiError.requestBodyEncoding(underlyingError: error)
+        }
+        
+        do {
+            try await self.call?.sendAppMessage(json: jsonData, to: .all)
+        } catch {
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to send app message",
+                context: ["error": String(describing: error)]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "sendAppMessage")
+        }
     }
 
     public func setMuted(_ muted: Bool) async throws {
@@ -185,14 +203,17 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call.setInputEnabled(.microphone, !muted)
             self.isMicrophoneMuted = muted
-            if muted {
-                print("Audio muted")
-            } else {
-                print("Audio unmuted")
-            }
         } catch {
-            print("Failed to set mute state: \(error)")
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to set mute state",
+                context: [
+                    "muted": String(muted),
+                    "error": String(describing: error)
+                ]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "setMuted")
         }
     }
 
@@ -206,14 +227,17 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call.setInputEnabled(.microphone, !shouldBeMuted)
             self.isMicrophoneMuted = shouldBeMuted
-            if shouldBeMuted {
-                print("Audio muted")
-            } else {
-                print("Audio unmuted")
-            }
         } catch {
-            print("Failed to toggle mute state: \(error)")
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to toggle mute state",
+                context: [
+                    "targetMuted": String(shouldBeMuted),
+                    "error": String(describing: error)
+                ]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "toggleMuted")
         }
     }
     
@@ -245,8 +269,16 @@ public final class Vapi: CallClientDelegate {
             )
             isAssistantMuted = muted
         } catch {
-            print("Failed to set subscription state to \(muted ? "Staged" : "Subscribed") for remote assistant")
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to set assistant mute state",
+                context: [
+                    "muted": String(muted),
+                    "error": String(describing: error)
+                ]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "setAssistantMuted")
         }
     }
     
@@ -265,8 +297,13 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call.setPreferredAudioDevice(audioDeviceType)
         } catch {
-            print("Failed to change the AudioDeviceType with error: \(error)")
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to change audio device type",
+                context: ["error": String(describing: error)]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "setAudioDeviceType")
         }
     }
 
@@ -301,7 +338,18 @@ public final class Vapi: CallClientDelegate {
                     )
                 )
             } catch {
-                callDidFail(with: error)
+                let wrappedError = VapiError.webRTCError(underlyingError: error, operation: "joinCall")
+                VapiLogger.log(
+                    level: .error,
+                    component: .webRTC,
+                    message: "Failed to join or start recording",
+                    context: [
+                        "url": url.absoluteString,
+                        "recordVideo": String(recordVideo),
+                        "error": String(describing: error)
+                    ]
+                )
+                callDidFail(with: wrappedError)
             }
         }
     }
@@ -329,9 +377,17 @@ public final class Vapi: CallClientDelegate {
     }
     
     private func startCall(body: [String: Any]) async throws -> WebCallResponse {
-        guard let url = makeURL(for: "/call/web") else {
-            callDidFail(with: VapiError.invalidURL)
-            throw VapiError.customError("Unable to create web call")
+        let path = "/call/web"
+        guard let url = makeURL(for: path) else {
+            let error = VapiError.urlConstruction(host: configuration.host, path: path)
+            VapiLogger.log(
+                level: .error,
+                component: .urlConstruction,
+                message: "Failed to construct URL",
+                context: ["host": configuration.host, "path": path]
+            )
+            callDidFail(with: error)
+            throw error
         }
         
         var request = makeURLRequest(for: url)
@@ -339,8 +395,15 @@ public final class Vapi: CallClientDelegate {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
-            self.callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            let wrappedError = VapiError.requestBodyEncoding(underlyingError: error)
+            VapiLogger.log(
+                level: .error,
+                component: .network,
+                message: "Failed to encode request body",
+                context: ["error": String(describing: error)]
+            )
+            self.callDidFail(with: wrappedError)
+            throw wrappedError
         }
         
         do {
@@ -348,9 +411,13 @@ public final class Vapi: CallClientDelegate {
             let isVideoRecordingEnabled = response.artifactPlan?.videoRecordingEnabled ?? false
             joinCall(url: response.webCallUrl, recordVideo: isVideoRecordingEnabled)
             return response
-        } catch {
+        } catch let error as VapiError {
             callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            throw error
+        } catch {
+            let wrappedError = VapiError.networkError(underlyingError: error, url: url)
+            callDidFail(with: wrappedError)
+            throw wrappedError
         }
     }
     
@@ -387,7 +454,13 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call?.startLocalAudioLevelObserver()
         } catch {
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to start local audio level observer",
+                context: ["error": String(describing: error)]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "startLocalAudioLevelObserver")
         }
     }
     
@@ -395,26 +468,39 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call?.startRemoteParticipantsAudioLevelObserver()
         } catch {
-            throw error
+            VapiLogger.log(
+                level: .error,
+                component: .webRTC,
+                message: "Failed to start remote participants audio level observer",
+                context: ["error": String(describing: error)]
+            )
+            throw VapiError.webRTCError(underlyingError: error, operation: "startRemoteParticipantsAudioLevelObserver")
         }
     }
     
     // MARK: - CallClientDelegate
     
     func callDidJoin() {
-        print("Successfully joined call.")
-        // Note: the call start event will be sent once the assistant has joined and is listening
+        VapiLogger.log(level: .info, component: .callLifecycle, message: "Successfully joined call")
     }
     
     func callDidLeave() {
-        print("Successfully left call.")
+        VapiLogger.log(level: .info, component: .callLifecycle, message: "Successfully left call")
         
         self.eventSubject.send(.callDidEnd)
         self.call = nil
     }
     
     func callDidFail(with error: Swift.Error) {
-        print("Got error while joining/leaving call: \(error).")
+        VapiLogger.log(
+            level: .error,
+            component: .callLifecycle,
+            message: "Call failed",
+            context: [
+                "errorType": String(describing: type(of: error)),
+                "error": String(describing: error)
+            ]
+        )
         
         self.eventSubject.send(.error(error))
         self.call = nil
@@ -437,7 +523,12 @@ public final class Vapi: CallClientDelegate {
                 try await call?.sendAppMessage(json: jsonData, to: .all)
             }
         } catch {
-            print("Error sending message: \(error.localizedDescription)")
+            VapiLogger.log(
+                level: .error,
+                component: .appMessage,
+                message: "Failed to send playable message",
+                context: ["error": String(describing: error)]
+            )
         }
     }
     
@@ -559,8 +650,17 @@ public final class Vapi: CallClientDelegate {
             }
             eventSubject.send(event)
         } catch {
-            let messageText = String(data: jsonData, encoding: .utf8)
-            print("Error parsing app message \"\(messageText ?? "")\": \(error.localizedDescription)")
+            let messageText = String(data: jsonData, encoding: .utf8) ?? "<non-UTF8>"
+            VapiLogger.log(
+                level: .error,
+                component: .appMessage,
+                message: "Failed to parse incoming app message",
+                context: [
+                    "rawMessage": messageText,
+                    "errorType": String(describing: type(of: error)),
+                    "error": String(describing: error)
+                ]
+            )
         }
     }
 }
