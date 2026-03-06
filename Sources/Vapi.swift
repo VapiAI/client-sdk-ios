@@ -65,12 +65,23 @@ public final class Vapi: CallClientDelegate {
         case hang
         case error(Swift.Error)
     }
+
+    /// Structured telemetry emitted whenever the SDK encounters an error.
+    public struct TelemetryEvent {
+        public let timestamp: Date
+        public let operation: String
+        public let errorCode: String
+        public let message: String
+        public let metadata: [String: String]
+        public let underlyingError: String?
+    }
     
     // MARK: - Properties
 
     public let configuration: Configuration
 
     fileprivate let eventSubject = PassthroughSubject<Event, Never>()
+    public var telemetryHandler: ((TelemetryEvent) -> Void)?
     
     private let networkManager = NetworkManager()
     private var call: CallClient?
@@ -153,28 +164,36 @@ public final class Vapi: CallClientDelegate {
                 try await call?.leave()
                 call = nil
             } catch {
-                self.callDidFail(with: error)
+                let wrappedError = self.wrapAsWebRTCFailure(error, operation: "stop.leave")
+                self.callDidFail(with: wrappedError)
             }
         }
     }
 
     public func send(message: VapiMessage) async throws {
+        let jsonData: Data
+
         do {
-          // Use JSONEncoder to convert the message to JSON Data
-          let jsonData = try JSONEncoder().encode(message)
-          
-          // Debugging: Print the JSON data to verify its format (optional)
-          if let jsonString = String(data: jsonData, encoding: .utf8) {
-              print(jsonString)
-          }
-          
-          // Send the JSON data to all targets
-          try await self.call?.sendAppMessage(json: jsonData, to: .all)
-      } catch {
-          // Handle encoding error
-          print("Error encoding message to JSON: \(error)")
-          throw error // Re-throw the error to be handled by the caller
-      }
+            jsonData = try JSONEncoder().encode(message)
+        } catch {
+            let wrappedError = wrapAsRequestBodyEncodingFailure(error)
+            emitTelemetry(operation: "send.encodeMessage", error: wrappedError)
+            throw wrappedError
+        }
+
+        // Debugging: Print the JSON data to verify its format (optional)
+        if let jsonString = String(data: jsonData, encoding: .utf8) {
+            print(jsonString)
+        }
+
+        do {
+            // Send the JSON data to all targets
+            try await self.call?.sendAppMessage(json: jsonData, to: .all)
+        } catch {
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "send.appMessage")
+            emitTelemetry(operation: "send.appMessage", error: wrappedError)
+            throw wrappedError
+        }
     }
 
     public func setMuted(_ muted: Bool) async throws {
@@ -191,8 +210,10 @@ public final class Vapi: CallClientDelegate {
                 print("Audio unmuted")
             }
         } catch {
-            print("Failed to set mute state: \(error)")
-            throw error
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "setMuted")
+            print("Failed to set mute state: \(wrappedError)")
+            emitTelemetry(operation: "setMuted", error: wrappedError, metadata: ["muted": String(muted)])
+            throw wrappedError
         }
     }
 
@@ -212,8 +233,10 @@ public final class Vapi: CallClientDelegate {
                 print("Audio unmuted")
             }
         } catch {
-            print("Failed to toggle mute state: \(error)")
-            throw error
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "isMuted.toggle")
+            print("Failed to toggle mute state: \(wrappedError)")
+            emitTelemetry(operation: "isMuted.toggle", error: wrappedError)
+            throw wrappedError
         }
     }
     
@@ -245,8 +268,10 @@ public final class Vapi: CallClientDelegate {
             )
             isAssistantMuted = muted
         } catch {
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "setAssistantMuted")
             print("Failed to set subscription state to \(muted ? "Staged" : "Subscribed") for remote assistant")
-            throw error
+            emitTelemetry(operation: "setAssistantMuted", error: wrappedError, metadata: ["muted": String(muted)])
+            throw wrappedError
         }
     }
     
@@ -265,8 +290,14 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call.setPreferredAudioDevice(audioDeviceType)
         } catch {
-            print("Failed to change the AudioDeviceType with error: \(error)")
-            throw error
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "setAudioDeviceType")
+            print("Failed to change the AudioDeviceType with error: \(wrappedError)")
+            emitTelemetry(
+                operation: "setAudioDeviceType",
+                error: wrappedError,
+                metadata: ["audioDeviceType": String(describing: audioDeviceType)]
+            )
+            throw wrappedError
         }
     }
 
@@ -301,7 +332,8 @@ public final class Vapi: CallClientDelegate {
                     )
                 )
             } catch {
-                callDidFail(with: error)
+                let wrappedError = wrapAsWebRTCFailure(error, operation: "joinCall.joinOrStartRecording")
+                callDidFail(with: wrappedError)
             }
         }
     }
@@ -327,11 +359,76 @@ public final class Vapi: CallClientDelegate {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         return request
     }
+
+    private func wrapAsNetworkFailure(_ error: Error) -> VapiError {
+        if let vapiError = error as? VapiError {
+            return vapiError
+        }
+
+        return .networkFailure(underlying: error)
+    }
+
+    private func wrapAsWebRTCFailure(_ error: Error, operation: String) -> VapiError {
+        if let vapiError = error as? VapiError {
+            return vapiError
+        }
+
+        return .webRTCFailure(operation: operation, underlying: error)
+    }
+
+    private func wrapAsRequestBodyEncodingFailure(_ error: Error) -> VapiError {
+        if let vapiError = error as? VapiError {
+            return vapiError
+        }
+
+        return .requestBodyEncodingFailed(underlying: error)
+    }
+
+    private func emitTelemetry(operation: String, error: Error, metadata: [String: String] = [:]) {
+        let vapiError = error as? VapiError
+        let wrappedMessage = vapiError?.errorDescription
+        let errorCode = vapiError?.code.rawValue ?? "unknown"
+        let nsError = error as NSError
+        let underlying = vapiError?.underlyingError ?? (nsError.userInfo[NSUnderlyingErrorKey] as? Error)
+        let underlyingDescription = underlying.map { String(describing: $0) }
+        let message = wrappedMessage ?? error.localizedDescription
+
+        let telemetryEvent = TelemetryEvent(
+            timestamp: Date(),
+            operation: operation,
+            errorCode: errorCode,
+            message: message,
+            metadata: metadata,
+            underlyingError: underlyingDescription
+        )
+        telemetryHandler?(telemetryEvent)
+
+        var payload: [String: Any] = [
+            "timestamp": ISO8601DateFormatter().string(from: telemetryEvent.timestamp),
+            "operation": telemetryEvent.operation,
+            "errorCode": telemetryEvent.errorCode,
+            "message": telemetryEvent.message,
+            "metadata": telemetryEvent.metadata,
+        ]
+        if let underlyingDescription {
+            payload["underlyingError"] = underlyingDescription
+        }
+
+        if
+            let jsonData = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+            let jsonString = String(data: jsonData, encoding: .utf8)
+        {
+            print("VapiTelemetry \(jsonString)")
+        } else {
+            print("VapiTelemetry operation=\(operation) errorCode=\(errorCode) message=\(message)")
+        }
+    }
     
     private func startCall(body: [String: Any]) async throws -> WebCallResponse {
         guard let url = makeURL(for: "/call/web") else {
-            callDidFail(with: VapiError.invalidURL)
-            throw VapiError.customError("Unable to create web call")
+            let wrappedError = VapiError.urlConstructionFailed(host: configuration.host, path: "/call/web")
+            callDidFail(with: wrappedError)
+            throw wrappedError
         }
         
         var request = makeURLRequest(for: url)
@@ -339,8 +436,9 @@ public final class Vapi: CallClientDelegate {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
-            self.callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            let wrappedError = wrapAsRequestBodyEncodingFailure(error)
+            self.callDidFail(with: wrappedError)
+            throw wrappedError
         }
         
         do {
@@ -349,8 +447,9 @@ public final class Vapi: CallClientDelegate {
             joinCall(url: response.webCallUrl, recordVideo: isVideoRecordingEnabled)
             return response
         } catch {
-            callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            let wrappedError = wrapAsNetworkFailure(error)
+            callDidFail(with: wrappedError)
+            throw wrappedError
         }
     }
     
@@ -387,7 +486,9 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call?.startLocalAudioLevelObserver()
         } catch {
-            throw error
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "startLocalAudioLevelObserver")
+            emitTelemetry(operation: "startLocalAudioLevelObserver", error: wrappedError)
+            throw wrappedError
         }
     }
     
@@ -395,7 +496,9 @@ public final class Vapi: CallClientDelegate {
         do {
             try await call?.startRemoteParticipantsAudioLevelObserver()
         } catch {
-            throw error
+            let wrappedError = wrapAsWebRTCFailure(error, operation: "startRemoteParticipantsAudioLevelObserver")
+            emitTelemetry(operation: "startRemoteParticipantsAudioLevelObserver", error: wrappedError)
+            throw wrappedError
         }
     }
     
@@ -414,6 +517,7 @@ public final class Vapi: CallClientDelegate {
     }
     
     func callDidFail(with error: Swift.Error) {
+        emitTelemetry(operation: "callDidFail", error: error)
         print("Got error while joining/leaving call: \(error).")
         
         self.eventSubject.send(.error(error))
@@ -434,10 +538,17 @@ public final class Vapi: CallClientDelegate {
             let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
             
             Task {
-                try await call?.sendAppMessage(json: jsonData, to: .all)
+                do {
+                    try await call?.sendAppMessage(json: jsonData, to: .all)
+                } catch {
+                    let wrappedError = self.wrapAsWebRTCFailure(error, operation: "participantUpdated.sendAppMessage")
+                    self.emitTelemetry(operation: "participantUpdated.sendAppMessage", error: wrappedError)
+                }
             }
         } catch {
-            print("Error sending message: \(error.localizedDescription)")
+            let wrappedError = wrapAsRequestBodyEncodingFailure(error)
+            emitTelemetry(operation: "participantUpdated.encodePlayableMessage", error: wrappedError)
+            print("Error sending message: \(wrappedError.localizedDescription)")
         }
     }
     
@@ -561,6 +672,11 @@ public final class Vapi: CallClientDelegate {
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)
             print("Error parsing app message \"\(messageText ?? "")\": \(error.localizedDescription)")
+            emitTelemetry(
+                operation: "appMessage.decode",
+                error: error,
+                metadata: ["rawMessage": messageText ?? ""]
+            )
         }
     }
 }
