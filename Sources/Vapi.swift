@@ -340,7 +340,7 @@ public final class Vapi: CallClientDelegate {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
             self.callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            throw VapiError.customError(String(describing: error))
         }
         
         do {
@@ -348,9 +348,12 @@ public final class Vapi: CallClientDelegate {
             let isVideoRecordingEnabled = response.artifactPlan?.videoRecordingEnabled ?? false
             joinCall(url: response.webCallUrl, recordVideo: isVideoRecordingEnabled)
             return response
+        } catch let vapiError as VapiError {
+            callDidFail(with: vapiError)
+            throw vapiError
         } catch {
             callDidFail(with: error)
-            throw VapiError.customError(error.localizedDescription)
+            throw VapiError.customError(String(describing: error))
         }
     }
     
@@ -560,7 +563,7 @@ public final class Vapi: CallClientDelegate {
             eventSubject.send(event)
         } catch {
             let messageText = String(data: jsonData, encoding: .utf8)
-            print("Error parsing app message \"\(messageText ?? "")\": \(error.localizedDescription)")
+            print("Error parsing app message \"\(messageText ?? "")\": \(error)")
         }
     }
 }

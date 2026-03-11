@@ -15,7 +15,7 @@ class NetworkManager {
             return result
         } catch {
             let responseString = String(data: data, encoding: .utf8)
-            throw VapiError.decodingError(message: error.localizedDescription, response: responseString)
+            throw VapiError.decodingError(message: String(describing: error), response: responseString)
         }
     }
 }
