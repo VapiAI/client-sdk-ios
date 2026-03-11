@@ -17,18 +17,12 @@ public enum VapiError: Swift.Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidURL:
-            return "invalidURL"
         case .customError(let message):
             return message
-        case .existingCallInProgress:
-            return "existingCallInProgress"
-        case .noCallInProgress:
-            return "noCallInProgress"
         case .decodingError(let message, let response):
             return response ?? message
-        case .invalidJsonData:
-            return "invalidJsonData"
+        default:
+            return String(describing: self)
         }
     }
 }
